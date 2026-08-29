@@ -5,7 +5,6 @@ import Link from "next/link";
 import { NavigationDrawer } from "./NavigationDrawer";
 import { Search, X, Package } from "lucide-react";
 import { useCart } from "@/context/CartContext";
-// 1. Import client Supabase lu
 import { createClient } from "@/lib/supabase/client";
 
 interface HeaderProps {
@@ -24,21 +23,18 @@ export default function Header({ logoUrl, siteName, categories = [], navItems = 
   const { cart } = useCart();
   const [isMounted, setIsMounted] = useState(false);
   
-  // 2. State untuk menyimpan data user
   const [user, setUser] = useState<any>(null);
   const supabase = createClient();
 
   useEffect(() => {
     setIsMounted(true);
 
-    // 3. Tarik data sesi user saat komponen dimuat
     const getUser = async () => {
       const { data: { user } } = await supabase.auth.getUser();
       setUser(user);
     };
     getUser();
 
-    // 4. Pantau perubahan status (jika tiba-tiba login/logout)
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user ?? null);
     });
@@ -114,13 +110,11 @@ export default function Header({ logoUrl, siteName, categories = [], navItems = 
               )}
             </Link>
 
-            {/* 5. LOGIKA RENDER TOMBOL LOGIN / PROFIL */}
             {isMounted && user ? (
-              <Link href="/dashboard" aria-label="Dashboard" className="relative p-1.5 text-black hover:opacity-70 transition-opacity">
+              <Link href="#" aria-label="Account" className="relative p-1.5 text-black hover:opacity-70 transition-opacity">
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                 </svg>
-                {/* Indikator titik hijau bahwa user SUDAH LOGIN */}
                 <span className="absolute top-1.5 right-1.5 flex h-2.5 w-2.5 rounded-full bg-green-500 ring-2 ring-white"></span>
               </Link>
             ) : (

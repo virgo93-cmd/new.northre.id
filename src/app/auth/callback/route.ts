@@ -4,8 +4,8 @@ import { createClient } from '../../../lib/supabase/server'
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url)
   const code = searchParams.get('code')
-  // Ambil parameter next jika ada, jika tidak kembalikan ke beranda (/)
-  const next = searchParams.get('next') ?? '/'
+  // Ubah default fallback dari '/' menjadi '/account'
+  const next = searchParams.get('next') ?? '/account'
 
   if (code) {
     const supabase = await createClient()

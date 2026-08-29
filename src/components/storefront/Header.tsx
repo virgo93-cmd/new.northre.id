@@ -5,6 +5,8 @@ import Link from "next/link";
 import { NavigationDrawer } from "./NavigationDrawer";
 import { Search, X, Package } from "lucide-react";
 import { useCart } from "@/context/CartContext";
+// 1. Import client Supabase lu
+import { createClient } from "@/lib/supabase/client";
 
 interface HeaderProps {
   logoUrl?: string;
@@ -19,13 +21,30 @@ export default function Header({ logoUrl, siteName, categories = [], navItems = 
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   
-  // Cart Integration & Hydration state
   const { cart } = useCart();
   const [isMounted, setIsMounted] = useState(false);
+  
+  // 2. State untuk menyimpan data user
+  const [user, setUser] = useState<any>(null);
+  const supabase = createClient();
 
   useEffect(() => {
     setIsMounted(true);
-  }, []);
+
+    // 3. Tarik data sesi user saat komponen dimuat
+    const getUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      setUser(user);
+    };
+    getUser();
+
+    // 4. Pantau perubahan status (jika tiba-tiba login/logout)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null);
+    });
+
+    return () => subscription.unsubscribe();
+  }, [supabase.auth]);
 
   const totalCartItems = cart.reduce((total, item) => total + item.quantity, 0);
 
@@ -36,7 +55,6 @@ export default function Header({ logoUrl, siteName, categories = [], navItems = 
     (item) => item.is_active && (item.location === "header" || item.location === "Header Nav")
   );
 
-  // Filter produk secara real-time berdasarkan keyword pencarian
   const searchResults = useMemo(() => {
     if (!searchQuery.trim()) return [];
     const query = searchQuery.toLowerCase();
@@ -76,7 +94,6 @@ export default function Header({ logoUrl, siteName, categories = [], navItems = 
           </div>
 
           <div className="flex items-center space-x-1 sm:space-x-2 z-10">
-            {/* Tombol Search Interaktif */}
             <button 
               type="button" 
               onClick={() => setIsSearchOpen(true)}
@@ -86,12 +103,10 @@ export default function Header({ logoUrl, siteName, categories = [], navItems = 
               <Search className="w-5 h-5" />
             </button>
 
-            {/* Tombol Cart dengan Badge Angka */}
             <Link href="/cart" aria-label="Cart" className="relative p-1.5 text-black hover:opacity-70 transition-opacity">
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
               </svg>
-              {/* Badge cuma muncul saat mounted & barang > 0 */}
               {isMounted && totalCartItems > 0 && (
                 <span className="absolute top-0 right-0 flex h-[15px] w-[15px] -translate-y-0.5 translate-x-0.5 items-center justify-center rounded-full bg-black text-[9px] font-bold text-white shadow-sm ring-2 ring-white">
                   {totalCartItems}
@@ -99,22 +114,31 @@ export default function Header({ logoUrl, siteName, categories = [], navItems = 
               )}
             </Link>
 
-            <Link href="/login" aria-label="Account" className="p-1.5 text-black hover:opacity-70 transition-opacity">
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-              </svg>
-            </Link>
+            {/* 5. LOGIKA RENDER TOMBOL LOGIN / PROFIL */}
+            {isMounted && user ? (
+              <Link href="/dashboard" aria-label="Dashboard" className="relative p-1.5 text-black hover:opacity-70 transition-opacity">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                </svg>
+                {/* Indikator titik hijau bahwa user SUDAH LOGIN */}
+                <span className="absolute top-1.5 right-1.5 flex h-2.5 w-2.5 rounded-full bg-green-500 ring-2 ring-white"></span>
+              </Link>
+            ) : (
+              <Link href="/login" aria-label="Account" className="p-1.5 text-black hover:opacity-70 transition-opacity">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                </svg>
+              </Link>
+            )}
           </div>
 
         </div>
       </header>
 
-      {/* Modal / Overlay Search */}
       {isSearchOpen && (
         <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-xs flex flex-col pt-16 px-4 md:px-20 animate-in fade-in duration-200">
           <div className="max-w-3xl w-full mx-auto bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[80vh]">
             
-            {/* Input Bar Search */}
             <div className="flex items-center px-6 py-4 border-b border-gray-200 gap-3">
               <Search className="w-6 h-6 text-neutral-400 shrink-0" />
               <input
@@ -134,7 +158,6 @@ export default function Header({ logoUrl, siteName, categories = [], navItems = 
               </button>
             </div>
 
-            {/* Hasil Pencarian */}
             <div className="overflow-y-auto p-4 md:p-6 space-y-3 flex-1 bg-neutral-50">
               {searchQuery.trim() === "" ? (
                 <div className="text-center py-12 text-neutral-400 text-sm">
@@ -149,7 +172,6 @@ export default function Header({ logoUrl, siteName, categories = [], navItems = 
                   {searchResults.map((product: any) => {
                     const imgUrl = product.image_url || product.images?.[0] || "";
                     
-                    // Deteksi Regular Price & Sale Price
                     const regularPrice = Number(
                       product.price ?? 
                       product.base_price ?? 

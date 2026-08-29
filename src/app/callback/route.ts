@@ -1,9 +1,10 @@
 import { NextResponse } from 'next/server'
-import { createClient } from '../../../lib/supabase/server'
+import { createClient } from '@/lib/supabase/server'
 
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url)
   const code = searchParams.get('code')
+  // Halaman tujuan setelah login (default ke beranda /)
   const next = searchParams.get('next') ?? '/'
 
   if (code) {
@@ -24,5 +25,6 @@ export async function GET(request: Request) {
     }
   }
 
+  // Kalau gagal, lempar balik ke halaman login atau error
   return NextResponse.redirect(`${origin}/login`)
 }

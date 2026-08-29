@@ -18,6 +18,10 @@ export default function LoginPage() {
       provider: "google",
       options: {
         redirectTo: `${window.location.origin}/auth/callback`,
+        // Tambahan parameter ini memaksa Google selalu menampilkan layar pilih akun
+        queryParams: {
+          prompt: "consent",
+        },
       },
     });
 

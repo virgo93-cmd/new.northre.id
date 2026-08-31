@@ -1,29 +1,43 @@
-import { NextResponse } from 'next/server'
-import { createClient } from '../../../lib/supabase/server'
+import { createServerClient } from "@supabase/ssr";
+import { NextRequest, NextResponse } from "next/server";
+import type { Database } from "../../../../types/database.types";
 
-export async function GET(request: Request) {
-  const { searchParams, origin } = new URL(request.url)
-  const code = searchParams.get('code')
-  // Ubah default fallback dari '/' menjadi '/account'
-  const next = searchParams.get('next') ?? '/account'
+function safeNextPath(value: string | null) {
+  return value?.startsWith("/") && !value.startsWith("//") ? value : "/account";
+}
 
-  if (code) {
-    const supabase = await createClient()
-    const { error } = await supabase.auth.exchangeCodeForSession(code)
-    
-    if (!error) {
-      const forwardedHost = request.headers.get('x-forwarded-host') 
-      const isLocalEnv = process.env.NODE_ENV === 'development'
-      
-      if (isLocalEnv) {
-        return NextResponse.redirect(`${origin}${next}`)
-      } else if (forwardedHost) {
-        return NextResponse.redirect(`https://${forwardedHost}${next}`)
-      } else {
-        return NextResponse.redirect(`${origin}${next}`)
-      }
-    }
+export async function GET(request: NextRequest) {
+  const code = request.nextUrl.searchParams.get("code");
+  const nextPath = safeNextPath(request.nextUrl.searchParams.get("next"));
+  const destination = new URL(nextPath, request.url);
+  const response = NextResponse.redirect(destination);
+
+  if (!code) {
+    return NextResponse.redirect(new URL("/login?error=missing_oauth_code", request.url));
   }
 
-  return NextResponse.redirect(`${origin}/login`)
+  const supabase = createServerClient<Database>(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        getAll() {
+          return request.cookies.getAll();
+        },
+        setAll(cookiesToSet) {
+          cookiesToSet.forEach(({ name, value, options }) => {
+            response.cookies.set(name, value, options);
+          });
+        },
+      },
+    },
+  );
+
+  const { error } = await supabase.auth.exchangeCodeForSession(code);
+  if (error) {
+    console.error("Google OAuth callback failed:", error.message);
+    return NextResponse.redirect(new URL("/login?error=oauth_callback_failed", request.url));
+  }
+
+  return response;
 }

@@ -1,208 +1,65 @@
 "use client";
 
 import { useState } from "react";
+import { Check, Mail, Pencil, Phone, UserRound, X } from "lucide-react";
 import { CustomerProfile, updateCustomerProfileAction } from "@/modules/customer/customer.service";
-import { User, Mail, Phone, Shield, Share2, Users, Award, Edit3, CheckCircle2, AlertCircle } from "lucide-react";
 
 interface ProfileTabProps {
-  user: {
-    id: string;
-    email?: string;
-  };
+  user: { id: string; email?: string };
   profile: CustomerProfile | null;
 }
 
 export function ProfileTab({ user, profile }: ProfileTabProps) {
-  const [isEditing, setIsEditing] = useState(false);
-  const [fullName, setFullName] = useState(profile?.full_name || "");
-  const [firstName, setFirstName] = useState(profile?.first_name || "");
-  const [lastName, setLastName] = useState(profile?.last_name || "");
-  const [phoneNumber, setPhoneNumber] = useState(profile?.phone_number || "");
+  const [editing, setEditing] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const [notice, setNotice] = useState("");
+  const [fullName, setFullName] = useState(profile?.full_name || "");
+  const [phone, setPhone] = useState(profile?.phone_number || "");
 
-  const handleUpdateProfile = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const save = async (event: React.FormEvent) => {
+    event.preventDefault();
     setLoading(true);
-    setMessage(null);
-
+    setNotice("");
     try {
+      const parts = fullName.trim().split(/\s+/);
       await updateCustomerProfileAction(user.id, {
-        full_name: fullName,
-        first_name: firstName,
-        last_name: lastName,
-        phone_number: phoneNumber,
+        full_name: fullName.trim(),
+        first_name: parts[0] || "",
+        last_name: parts.slice(1).join(" "),
+        phone_number: phone.trim(),
       });
-      setMessage({ type: "success", text: "Profile updated successfully." });
-      setIsEditing(false);
+      setNotice("Profil berhasil diperbarui.");
+      setEditing(false);
     } catch (error: unknown) {
-      setMessage({ type: "error", text: error instanceof Error ? error.message : "Failed to update profile." });
+      setNotice(error instanceof Error ? error.message : "Profil belum berhasil disimpan.");
     } finally {
       setLoading(false);
     }
   };
 
+  const fieldClass = "w-full rounded-2xl border border-neutral-200 bg-white px-4 py-3.5 text-sm outline-none transition focus:border-black focus:ring-2 focus:ring-black/5";
+
   return (
-    <div className="space-y-6">
-      {/* Header & Edit Action */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-neutral-100">
-        <div>
-          <h2 className="text-xl font-black tracking-tight text-neutral-900 uppercase">Profile Details</h2>
-          <p className="text-xs text-neutral-500 font-medium mt-1">
-            Manage your personal data and view account credentials.
-          </p>
-        </div>
-        {!isEditing && (
-          <button
-            onClick={() => setIsEditing(true)}
-            className="inline-flex items-center gap-2 px-5 py-2.5 bg-neutral-900 hover:bg-neutral-800 text-white text-xs font-bold uppercase tracking-wider rounded-xl transition-all cursor-pointer shadow-sm"
-          >
-            <Edit3 className="w-3.5 h-3.5" />
-            <span>Edit Profile</span>
-          </button>
-        )}
+    <div>
+      <div className="flex flex-col justify-between gap-4 border-b border-neutral-100 pb-6 sm:flex-row sm:items-center">
+        <div><h2 className="text-2xl font-semibold tracking-tight">Profil saya</h2><p className="mt-1 text-sm text-neutral-500">Pastikan informasi kontak kamu tetap akurat.</p></div>
+        {!editing && <button type="button" onClick={() => setEditing(true)} className="inline-flex w-fit items-center gap-2 rounded-full bg-black px-5 py-3 text-xs font-semibold uppercase tracking-widest text-white"><Pencil className="h-3.5 w-3.5" /> Edit profil</button>}
       </div>
 
-      {message && (
-        <div className={`flex items-center gap-3 p-4 rounded-xl text-xs font-bold ${
-          message.type === "success"
-            ? "bg-emerald-50 text-emerald-800 border border-emerald-200"
-            : "bg-rose-50 text-rose-800 border border-rose-200"
-        }`}>
-          {message.type === "success" ? <CheckCircle2 className="w-4 h-4 text-emerald-600" /> : <AlertCircle className="w-4 h-4 text-rose-600" />}
-          <span>{message.text}</span>
-        </div>
-      )}
+      {notice && <div className="mt-5 flex items-center gap-2 rounded-2xl bg-neutral-100 px-4 py-3 text-sm"><Check className="h-4 w-4" />{notice}</div>}
 
-      {isEditing ? (
-        <form onSubmit={handleUpdateProfile} className="space-y-4 bg-neutral-50 p-6 rounded-3xl border border-neutral-200">
-          <div className="space-y-1">
-            <label className="text-[10px] font-bold uppercase tracking-widest text-neutral-500">Full Name (full_name)</label>
-            <input
-              type="text"
-              value={fullName}
-              onChange={(e) => setFullName(e.target.value)}
-              className="w-full px-4 py-3 bg-white border border-neutral-200 rounded-xl text-sm font-semibold text-neutral-900 focus:outline-none focus:ring-2 focus:ring-neutral-900"
-            />
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="space-y-1">
-              <label className="text-[10px] font-bold uppercase tracking-widest text-neutral-500">First Name (first_name)</label>
-              <input
-                type="text"
-                value={firstName}
-                onChange={(e) => setFirstName(e.target.value)}
-                className="w-full px-4 py-3 bg-white border border-neutral-200 rounded-xl text-sm font-semibold text-neutral-900 focus:outline-none focus:ring-2 focus:ring-neutral-900"
-              />
-            </div>
-            <div className="space-y-1">
-              <label className="text-[10px] font-bold uppercase tracking-widest text-neutral-500">Last Name (last_name)</label>
-              <input
-                type="text"
-                value={lastName}
-                onChange={(e) => setLastName(e.target.value)}
-                className="w-full px-4 py-3 bg-white border border-neutral-200 rounded-xl text-sm font-semibold text-neutral-900 focus:outline-none focus:ring-2 focus:ring-neutral-900"
-              />
-            </div>
-          </div>
-
-          <div className="space-y-1">
-            <label className="text-[10px] font-bold uppercase tracking-widest text-neutral-500">Phone Number (phone_number)</label>
-            <input
-              type="text"
-              value={phoneNumber}
-              onChange={(e) => setPhoneNumber(e.target.value)}
-              className="w-full px-4 py-3 bg-white border border-neutral-200 rounded-xl text-sm font-semibold text-neutral-900 focus:outline-none focus:ring-2 focus:ring-neutral-900"
-            />
-          </div>
-
-          <div className="flex items-center gap-3 pt-2">
-            <button
-              type="submit"
-              disabled={loading}
-              className="px-5 py-2.5 bg-neutral-900 hover:bg-neutral-800 text-white text-xs font-bold uppercase tracking-wider rounded-xl transition-all disabled:opacity-50 cursor-pointer"
-            >
-              {loading ? "Saving..." : "Save Changes"}
-            </button>
-            <button
-              type="button"
-              onClick={() => setIsEditing(false)}
-              className="px-5 py-2.5 bg-white border border-neutral-200 text-neutral-700 text-xs font-bold uppercase tracking-wider rounded-xl transition-all cursor-pointer"
-            >
-              Cancel
-            </button>
-          </div>
+      {editing ? (
+        <form onSubmit={save} className="mt-6 max-w-2xl space-y-5">
+          <div><label className="mb-2 block text-xs font-semibold text-neutral-600">Nama lengkap</label><input value={fullName} onChange={(e) => setFullName(e.target.value)} required className={fieldClass} autoComplete="name" /></div>
+          <div><label className="mb-2 block text-xs font-semibold text-neutral-600">Nomor WhatsApp</label><input value={phone} onChange={(e) => setPhone(e.target.value)} className={fieldClass} placeholder="08xxxxxxxxxx" autoComplete="tel" /></div>
+          <div><label className="mb-2 block text-xs font-semibold text-neutral-600">Email</label><input value={profile?.email || user.email || ""} disabled className={`${fieldClass} bg-neutral-50 text-neutral-400`} /><p className="mt-2 text-xs text-neutral-400">Email mengikuti akun Google yang kamu gunakan.</p></div>
+          <div className="flex gap-3 pt-2"><button disabled={loading} className="rounded-full bg-black px-6 py-3 text-xs font-semibold uppercase tracking-widest text-white disabled:opacity-50">{loading ? "Menyimpan..." : "Simpan"}</button><button type="button" onClick={() => setEditing(false)} className="inline-flex items-center gap-2 rounded-full border border-neutral-200 px-5 py-3 text-xs font-semibold"><X className="h-3.5 w-3.5" /> Batal</button></div>
         </form>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-
-          <div className="p-5 bg-neutral-50/60 rounded-2xl border border-neutral-200/70">
-            <div className="flex items-center gap-2 text-neutral-400 mb-2">
-              <User className="w-4 h-4 text-neutral-600" />
-              <span className="text-[10px] font-bold uppercase tracking-widest">full_name</span>
-            </div>
-            <p className="text-sm font-bold text-neutral-900">{profile?.full_name || "-"}</p>
-          </div>
-
-          <div className="p-5 bg-neutral-50/60 rounded-2xl border border-neutral-200/70">
-            <div className="flex items-center gap-2 text-neutral-400 mb-2">
-              <Mail className="w-4 h-4 text-neutral-600" />
-              <span className="text-[10px] font-bold uppercase tracking-widest">email</span>
-            </div>
-            <p className="text-sm font-bold text-neutral-900 truncate">{profile?.email || user.email}</p>
-          </div>
-
-          <div className="p-5 bg-neutral-50/60 rounded-2xl border border-neutral-200/70">
-            <div className="flex items-center gap-2 text-neutral-400 mb-2">
-              <User className="w-4 h-4 text-neutral-600" />
-              <span className="text-[10px] font-bold uppercase tracking-widest">first_name / last_name</span>
-            </div>
-            <p className="text-sm font-bold text-neutral-900">{profile?.first_name || "-"} {profile?.last_name || ""}</p>
-          </div>
-
-          <div className="p-5 bg-neutral-50/60 rounded-2xl border border-neutral-200/70">
-            <div className="flex items-center gap-2 text-neutral-400 mb-2">
-              <Phone className="w-4 h-4 text-neutral-600" />
-              <span className="text-[10px] font-bold uppercase tracking-widest">phone_number</span>
-            </div>
-            <p className="text-sm font-bold text-neutral-900">{profile?.phone_number || "-"}</p>
-          </div>
-
-          <div className="p-5 bg-neutral-50/60 rounded-2xl border border-neutral-200/70">
-            <div className="flex items-center gap-2 text-neutral-400 mb-2">
-              <Shield className="w-4 h-4 text-neutral-600" />
-              <span className="text-[10px] font-bold uppercase tracking-widest">role</span>
-            </div>
-            <p className="text-sm font-bold text-neutral-900 uppercase">{profile?.role || "customer"}</p>
-          </div>
-
-          <div className="p-5 bg-neutral-50/60 rounded-2xl border border-neutral-200/70">
-            <div className="flex items-center gap-2 text-neutral-400 mb-2">
-              <Award className="w-4 h-4 text-neutral-600" />
-              <span className="text-[10px] font-bold uppercase tracking-widest">is_affiliate / badge</span>
-            </div>
-            <p className="text-sm font-bold text-neutral-900">
-              {profile?.is_affiliate ? `Active (${profile.affiliate_badge || "bronze"})` : "Not an Affiliate"}
-            </p>
-          </div>
-
-          <div className="p-5 bg-neutral-50/60 rounded-2xl border border-neutral-200/70">
-            <div className="flex items-center gap-2 text-neutral-400 mb-2">
-              <Share2 className="w-4 h-4 text-neutral-600" />
-              <span className="text-[10px] font-bold uppercase tracking-widest">referral_code</span>
-            </div>
-            <p className="text-sm font-bold text-neutral-900 font-mono">{profile?.referral_code || "-"}</p>
-          </div>
-
-          <div className="p-5 bg-neutral-50/60 rounded-2xl border border-neutral-200/70">
-            <div className="flex items-center gap-2 text-neutral-400 mb-2">
-              <Users className="w-4 h-4 text-neutral-600" />
-              <span className="text-[10px] font-bold uppercase tracking-widest">referred_by</span>
-            </div>
-            <p className="text-sm font-bold text-neutral-900 font-mono truncate">{profile?.referred_by || "-"}</p>
-          </div>
-
+        <div className="mt-6 grid gap-4 sm:grid-cols-2">
+          <div className="rounded-[22px] bg-neutral-50 p-5"><UserRound className="mb-8 h-5 w-5 text-neutral-400" /><p className="text-xs text-neutral-400">Nama lengkap</p><p className="mt-1 text-sm font-semibold">{fullName || "Belum diisi"}</p></div>
+          <div className="rounded-[22px] bg-neutral-50 p-5"><Phone className="mb-8 h-5 w-5 text-neutral-400" /><p className="text-xs text-neutral-400">Nomor WhatsApp</p><p className="mt-1 text-sm font-semibold">{phone || "Belum diisi"}</p></div>
+          <div className="rounded-[22px] bg-neutral-50 p-5 sm:col-span-2"><Mail className="mb-8 h-5 w-5 text-neutral-400" /><p className="text-xs text-neutral-400">Email</p><p className="mt-1 truncate text-sm font-semibold">{profile?.email || user.email}</p></div>
         </div>
       )}
     </div>

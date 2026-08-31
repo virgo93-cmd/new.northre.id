@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { Wallet, ArrowUpRight, ArrowDownLeft, Clock, CheckCircle2, AlertCircle, PlusCircle } from "lucide-react";
+import { Wallet, ArrowDownLeft, CheckCircle2, AlertCircle, PlusCircle } from "lucide-react";
+import { createWithdrawalRequestAction } from "@/modules/customer/customer.service";
 
 export interface WalletData {
   id: string;
@@ -34,10 +35,11 @@ interface WalletTabProps {
   withdrawals?: WithdrawalRequest[];
 }
 
-export function WalletTab({ userId, wallet, transactions = [], withdrawals = [] }: WalletTabProps) {
+export function WalletTab({ wallet, transactions = [], withdrawals: initialWithdrawals = [] }: WalletTabProps) {
   const [isRequesting, setIsRequesting] = useState(false);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const [withdrawals, setWithdrawals] = useState(initialWithdrawals);
 
   // Form withdrawal
   const [amount, setAmount] = useState("");
@@ -51,8 +53,14 @@ export function WalletTab({ userId, wallet, transactions = [], withdrawals = [] 
     setMessage(null);
 
     try {
-      // Logika integrasi ke withdrawal_requests table
-      setMessage({ type: "success", text: "Withdrawal request submitted successfully to withdrawal_requests table." });
+      const request = await createWithdrawalRequestAction({
+        amount: Number(amount),
+        bank_name: bankName,
+        bank_account_number: bankAccountNumber,
+        bank_account_name: bankAccountName,
+      });
+      setWithdrawals((current) => [request, ...current]);
+      setMessage({ type: "success", text: "Permintaan penarikan berhasil dikirim." });
       setIsRequesting(false);
       setAmount("");
       setBankName("");
@@ -94,9 +102,9 @@ export function WalletTab({ userId, wallet, transactions = [], withdrawals = [] 
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-neutral-100">
         <div>
-          <h2 className="text-xl font-black tracking-tight text-neutral-900 uppercase">Wallet & Commissions</h2>
-          <p className="text-xs text-neutral-500 font-medium mt-1">
-            Manage your balance, cashback rewards, and bank withdrawal requests.
+          <h2 className="text-2xl font-semibold tracking-tight text-neutral-900">Wallet & benefit</h2>
+          <p className="mt-1 text-sm text-neutral-500">
+            Pantau saldo, cashback, komisi, dan penarikan dana.
           </p>
         </div>
         {!isRequesting && (
@@ -105,7 +113,7 @@ export function WalletTab({ userId, wallet, transactions = [], withdrawals = [] 
             className="inline-flex items-center gap-2 px-5 py-2.5 bg-neutral-900 hover:bg-neutral-800 text-white text-xs font-bold uppercase tracking-wider rounded-xl transition-all cursor-pointer shadow-sm"
           >
             <PlusCircle className="w-4 h-4" />
-            <span>Request Withdrawal</span>
+            <span>Tarik saldo</span>
           </button>
         )}
       </div>
@@ -125,42 +133,42 @@ export function WalletTab({ userId, wallet, transactions = [], withdrawals = [] 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div className="p-6 bg-neutral-900 text-white rounded-3xl shadow-xl flex flex-col justify-between space-y-4">
           <div className="flex items-center justify-between">
-            <span className="text-[10px] font-black uppercase tracking-widest text-neutral-400">Main Balance (balance)</span>
+            <span className="text-[10px] font-black uppercase tracking-widest text-neutral-400">Saldo tersedia</span>
             <Wallet className="w-5 h-5 text-neutral-400" />
           </div>
           <div>
             <p className="text-2xl sm:text-3xl font-black tracking-tight">
               Rp {(wallet?.balance || 0).toLocaleString("id-ID")}
             </p>
-            <p className="text-[10px] text-neutral-400 mt-1 uppercase">Available for withdrawal / order payment</p>
+            <p className="mt-1 text-xs text-neutral-400">Dapat ditarik atau digunakan untuk pembayaran.</p>
           </div>
         </div>
 
         <div className="p-6 bg-neutral-50 border border-neutral-200/80 rounded-3xl flex flex-col justify-between space-y-4">
           <div className="flex items-center justify-between">
-            <span className="text-[10px] font-black uppercase tracking-widest text-neutral-400">Cashback Balance (cashback_balance)</span>
+            <span className="text-[10px] font-black uppercase tracking-widest text-neutral-400">Cashback</span>
             <ArrowDownLeft className="w-5 h-5 text-neutral-600" />
           </div>
           <div>
             <p className="text-2xl sm:text-3xl font-black tracking-tight text-neutral-900">
               Rp {(wallet?.cashback_balance || 0).toLocaleString("id-ID")}
             </p>
-            <p className="text-[10px] text-neutral-500 mt-1 uppercase">Earned from store transactions</p>
+            <p className="mt-1 text-xs text-neutral-500">Reward dari transaksi NORTHRE.</p>
           </div>
         </div>
       </div>
 
       {isRequesting ? (
         <form onSubmit={handleWithdrawalRequest} className="space-y-4 bg-neutral-50 p-6 rounded-3xl border border-neutral-200">
-          <h3 className="text-sm font-black text-neutral-900 uppercase tracking-wide">New Withdrawal Request</h3>
+          <h3 className="text-sm font-semibold text-neutral-900">Permintaan penarikan baru</h3>
 
           <div className="space-y-1">
-            <label className="text-[10px] font-bold uppercase tracking-widest text-neutral-500">Amount (amount)</label>
+            <label className="text-xs font-semibold text-neutral-500">Nominal</label>
             <input
               type="number"
               value={amount}
               onChange={(e) => setAmount(e.target.value)}
-              placeholder="Enter nominal in IDR"
+              placeholder="Nominal dalam Rupiah"
               required
               className="w-full px-4 py-3 bg-white border border-neutral-200 rounded-xl text-sm font-semibold text-neutral-900 focus:outline-none focus:ring-2 focus:ring-neutral-900"
             />
@@ -168,7 +176,7 @@ export function WalletTab({ userId, wallet, transactions = [], withdrawals = [] 
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div className="space-y-1">
-              <label className="text-[10px] font-bold uppercase tracking-widest text-neutral-500">Bank Name (bank_name)</label>
+              <label className="text-xs font-semibold text-neutral-500">Nama bank</label>
               <input
                 type="text"
                 value={bankName}
@@ -179,7 +187,7 @@ export function WalletTab({ userId, wallet, transactions = [], withdrawals = [] 
               />
             </div>
             <div className="space-y-1">
-              <label className="text-[10px] font-bold uppercase tracking-widest text-neutral-500">Account Number (bank_account_number)</label>
+              <label className="text-xs font-semibold text-neutral-500">Nomor rekening</label>
               <input
                 type="text"
                 value={bankAccountNumber}
@@ -189,7 +197,7 @@ export function WalletTab({ userId, wallet, transactions = [], withdrawals = [] 
               />
             </div>
             <div className="space-y-1">
-              <label className="text-[10px] font-bold uppercase tracking-widest text-neutral-500">Account Name (bank_account_name)</label>
+              <label className="text-xs font-semibold text-neutral-500">Nama pemilik rekening</label>
               <input
                 type="text"
                 value={bankAccountName}
@@ -206,14 +214,14 @@ export function WalletTab({ userId, wallet, transactions = [], withdrawals = [] 
               disabled={loading}
               className="px-5 py-2.5 bg-neutral-900 hover:bg-neutral-800 text-white text-xs font-bold uppercase tracking-wider rounded-xl transition-all disabled:opacity-50 cursor-pointer"
             >
-              {loading ? "Submitting..." : "Submit Request"}
+              {loading ? "Mengirim..." : "Kirim permintaan"}
             </button>
             <button
               type="button"
               onClick={() => setIsRequesting(false)}
               className="px-5 py-2.5 bg-white border border-neutral-200 text-neutral-700 text-xs font-bold uppercase tracking-wider rounded-xl transition-all cursor-pointer"
             >
-              Cancel
+              Batal
             </button>
           </div>
         </form>
@@ -223,10 +231,10 @@ export function WalletTab({ userId, wallet, transactions = [], withdrawals = [] 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 pt-2">
         {/* Wallet Transactions */}
         <div className="space-y-4">
-          <h3 className="text-xs font-black text-neutral-900 uppercase tracking-widest">Wallet Transactions (wallet_transactions)</h3>
+          <h3 className="text-xs font-black text-neutral-900 uppercase tracking-widest">Aktivitas saldo</h3>
           {transactions.length === 0 ? (
             <div className="p-8 text-center border border-dashed border-neutral-300 rounded-2xl bg-neutral-50/50">
-              <p className="text-xs text-neutral-500 font-semibold">No recent transactions recorded.</p>
+              <p className="text-xs text-neutral-500 font-semibold">Belum ada aktivitas saldo.</p>
             </div>
           ) : (
             <div className="space-y-2">
@@ -252,10 +260,10 @@ export function WalletTab({ userId, wallet, transactions = [], withdrawals = [] 
 
         {/* Withdrawal Requests */}
         <div className="space-y-4">
-          <h3 className="text-xs font-black text-neutral-900 uppercase tracking-widest">Withdrawal Requests (withdrawal_requests)</h3>
+          <h3 className="text-xs font-black text-neutral-900 uppercase tracking-widest">Riwayat penarikan</h3>
           {withdrawals.length === 0 ? (
             <div className="p-8 text-center border border-dashed border-neutral-300 rounded-2xl bg-neutral-50/50">
-              <p className="text-xs text-neutral-500 font-semibold">No withdrawal requests made.</p>
+              <p className="text-xs text-neutral-500 font-semibold">Belum ada permintaan penarikan.</p>
             </div>
           ) : (
             <div className="space-y-2">

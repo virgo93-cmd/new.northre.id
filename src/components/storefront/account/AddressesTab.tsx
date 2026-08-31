@@ -2,6 +2,7 @@
 
 import { useState, type ChangeEvent, type FormEvent } from "react";
 import { AlertCircle, CheckCircle2, Home, MapPin, Plus } from "lucide-react";
+import { createCustomerAddressAction } from "@/modules/customer/customer.service";
 
 export interface Address {
   id: string;
@@ -87,7 +88,7 @@ function AddressCard({ address }: { address: Address }) {
   );
 }
 
-export function AddressesTab({ userId, initialAddresses = [] }: AddressesTabProps) {
+export function AddressesTab({ initialAddresses = [] }: AddressesTabProps) {
   const [addresses, setAddresses] = useState(initialAddresses);
   const [form, setForm] = useState<AddressForm>(EMPTY_FORM);
   const [isAdding, setIsAdding] = useState(false);
@@ -109,18 +110,14 @@ export function AddressesTab({ userId, initialAddresses = [] }: AddressesTabProp
     setMessage(null);
 
     try {
-      const shouldBeDefault = form.is_default || addresses.length === 0;
-      const newAddress: Address = {
-        ...form,
-        id: `${userId}-${crypto.randomUUID()}`,
-        is_default: shouldBeDefault,
-      };
+      const newAddress = await createCustomerAddressAction(form);
+      const shouldBeDefault = newAddress.is_default;
 
       setAddresses((current) => [
         newAddress,
         ...current.map((address) => shouldBeDefault ? { ...address, is_default: false } : address),
       ]);
-      setMessage({ type: "success", text: "Address added successfully to user_addresses." });
+      setMessage({ type: "success", text: "Alamat berhasil disimpan." });
       closeForm();
     } catch (error: unknown) {
       setMessage({ type: "error", text: error instanceof Error ? error.message : "Failed to add address." });
@@ -133,12 +130,12 @@ export function AddressesTab({ userId, initialAddresses = [] }: AddressesTabProp
     <div className="space-y-6">
       <div className="flex flex-col justify-between gap-4 border-b border-neutral-100 pb-6 sm:flex-row sm:items-center">
         <div>
-          <h2 className="text-xl font-black uppercase tracking-tight text-neutral-900">Saved Addresses</h2>
-          <p className="mt-1 text-xs font-medium text-neutral-500">Manage your delivery destinations synchronized with user_addresses table.</p>
+          <h2 className="text-2xl font-semibold tracking-tight text-neutral-900">Alamat pengiriman</h2>
+          <p className="mt-1 text-sm text-neutral-500">Simpan alamat agar checkout berikutnya jadi lebih cepat.</p>
         </div>
         {!isAdding && (
           <button type="button" onClick={() => setIsAdding(true)} className="inline-flex cursor-pointer items-center gap-2 rounded-xl bg-neutral-900 px-5 py-2.5 text-xs font-bold uppercase tracking-wider text-white shadow-sm transition-all hover:bg-neutral-800">
-            <Plus className="h-4 w-4" /><span>Add New Address</span>
+            <Plus className="h-4 w-4" /><span>Tambah alamat</span>
           </button>
         )}
       </div>
@@ -153,23 +150,23 @@ export function AddressesTab({ userId, initialAddresses = [] }: AddressesTabProp
       {isAdding ? (
         <form onSubmit={handleAddAddress} className="space-y-4 rounded-3xl border border-neutral-200 bg-neutral-50 p-6">
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <FormField label="Address Label (label)" name="label" value={form.label} placeholder="e.g. Rumah, Kantor" onChange={updateField} />
-            <FormField label="Recipient Name (recipient_name)" name="recipient_name" value={form.recipient_name} onChange={updateField} />
+            <FormField label="Label alamat" name="label" value={form.label} placeholder="Rumah, Kantor" onChange={updateField} />
+            <FormField label="Nama penerima" name="recipient_name" value={form.recipient_name} onChange={updateField} />
           </div>
-          <FormField label="Phone Number (phone_number)" name="phone_number" value={form.phone_number} onChange={updateField} />
-          <FormField label="Street Address (street_address)" name="street_address" value={form.street_address} multiline onChange={updateField} />
+          <FormField label="Nomor WhatsApp" name="phone_number" value={form.phone_number} onChange={updateField} />
+          <FormField label="Alamat lengkap" name="street_address" value={form.street_address} multiline onChange={updateField} />
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-            <FormField label="City (city)" name="city" value={form.city} onChange={updateField} />
-            <FormField label="Province (province)" name="province" value={form.province} onChange={updateField} />
-            <FormField label="Postal Code (postal_code)" name="postal_code" value={form.postal_code} onChange={updateField} />
+            <FormField label="Kota/Kabupaten" name="city" value={form.city} onChange={updateField} />
+            <FormField label="Provinsi" name="province" value={form.province} onChange={updateField} />
+            <FormField label="Kode pos" name="postal_code" value={form.postal_code} onChange={updateField} />
           </div>
           <div className="flex items-center gap-2 pt-2">
             <input id="is_default" type="checkbox" checked={form.is_default} onChange={(event) => setForm((current) => ({ ...current, is_default: event.target.checked }))} className="h-4 w-4 rounded accent-neutral-900" />
-            <label htmlFor="is_default" className="text-xs font-bold uppercase tracking-wider text-neutral-700">Set as default address (is_default)</label>
+            <label htmlFor="is_default" className="text-xs font-semibold text-neutral-700">Jadikan alamat utama</label>
           </div>
           <div className="flex items-center gap-3 pt-3">
-            <button type="submit" disabled={isSaving} className="cursor-pointer rounded-xl bg-neutral-900 px-5 py-2.5 text-xs font-bold uppercase tracking-wider text-white transition-all hover:bg-neutral-800 disabled:opacity-50">{isSaving ? "Saving..." : "Save Address"}</button>
-            <button type="button" onClick={closeForm} className="cursor-pointer rounded-xl border border-neutral-200 bg-white px-5 py-2.5 text-xs font-bold uppercase tracking-wider text-neutral-700 transition-all">Cancel</button>
+            <button type="submit" disabled={isSaving} className="cursor-pointer rounded-full bg-neutral-900 px-6 py-3 text-xs font-bold uppercase tracking-wider text-white transition-all hover:bg-neutral-800 disabled:opacity-50">{isSaving ? "Menyimpan..." : "Simpan alamat"}</button>
+            <button type="button" onClick={closeForm} className="cursor-pointer rounded-full border border-neutral-200 bg-white px-6 py-3 text-xs font-bold text-neutral-700 transition-all">Batal</button>
           </div>
         </form>
       ) : addresses.length === 0 ? (

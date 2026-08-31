@@ -1,139 +1,52 @@
 "use client";
 
+import Link from "next/link";
+import { ArrowRight, Box, CircleCheck, Clock3, MapPin, PackageCheck, Truck } from "lucide-react";
 import { CustomerOrder } from "@/modules/customer/customer.service";
-import { ShoppingBag } from "lucide-react";
 
-interface OrderHistoryTabProps {
-  orders: CustomerOrder[];
-}
+interface OrderHistoryTabProps { orders: CustomerOrder[] }
+
+const money = (value: number) => new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", maximumFractionDigits: 0 }).format(value);
+
+const statusMeta = (status: string) => {
+  switch (status) {
+    case "delivered": return { label: "Terkirim", icon: CircleCheck, className: "bg-emerald-50 text-emerald-700" };
+    case "shipped": return { label: "Dalam pengiriman", icon: Truck, className: "bg-blue-50 text-blue-700" };
+    case "processing": return { label: "Sedang diproses", icon: PackageCheck, className: "bg-violet-50 text-violet-700" };
+    case "cancelled": return { label: "Dibatalkan", icon: Box, className: "bg-red-50 text-red-700" };
+    case "refunded": return { label: "Dikembalikan", icon: Box, className: "bg-orange-50 text-orange-700" };
+    default: return { label: "Menunggu pembayaran", icon: Clock3, className: "bg-amber-50 text-amber-700" };
+  }
+};
 
 export function OrderHistoryTab({ orders }: OrderHistoryTabProps) {
-  const getStatusBadge = (status: string) => {
-    switch (status?.toLowerCase()) {
-      case "delivered":
-        return "bg-emerald-50 text-emerald-800 border-emerald-200";
-      case "processing":
-      case "shipped":
-        return "bg-blue-50 text-blue-800 border-blue-200";
-      case "cancelled":
-      case "refunded":
-        return "bg-rose-50 text-rose-800 border-rose-200";
-      default:
-        return "bg-amber-50 text-amber-800 border-amber-200";
-    }
-  };
-
-  const getPaymentBadge = (status: string) => {
-    switch (status?.toLowerCase()) {
-      case "paid":
-        return "bg-emerald-50 text-emerald-800 border-emerald-200";
-      case "failed":
-      case "refunded":
-        return "bg-rose-50 text-rose-800 border-rose-200";
-      default:
-        return "bg-amber-50 text-amber-800 border-amber-200";
-    }
-  };
-
-  const totalSpent = orders.reduce((acc, order) => acc + (Number(order.total_amount) || 0), 0);
+  const paidTotal = orders.filter((order) => order.payment_status === "paid").reduce((sum, order) => sum + Number(order.total_amount), 0);
 
   return (
-    <div className="space-y-6">
-      {/* Header & Overview Metrics */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-neutral-100">
-        <div>
-          <h2 className="text-xl font-black tracking-tight text-neutral-900 uppercase">Order History</h2>
-          <p className="text-xs text-neutral-500 font-medium mt-1">
-            Track fulfillment statuses, shipping details, and transaction records.
-          </p>
-        </div>
-
-        <div className="flex items-center gap-3">
-          <div className="px-4 py-2.5 bg-neutral-50 rounded-2xl border border-neutral-200/75 text-right">
-            <p className="text-[9px] font-black text-neutral-400 uppercase tracking-widest">Total Orders</p>
-            <p className="text-sm font-black text-neutral-900">{orders.length}</p>
-          </div>
-          <div className="px-4 py-2.5 bg-neutral-50 rounded-2xl border border-neutral-200/75 text-right">
-            <p className="text-[9px] font-black text-neutral-400 uppercase tracking-widest">Lifetime Spending</p>
-            <p className="text-sm font-black text-neutral-900">Rp {totalSpent.toLocaleString("id-ID")}</p>
-          </div>
-        </div>
+    <div>
+      <div className="flex flex-col justify-between gap-4 border-b border-neutral-100 pb-6 sm:flex-row sm:items-end">
+        <div><h2 className="text-2xl font-semibold tracking-tight">Pesanan saya</h2><p className="mt-1 text-sm text-neutral-500">Pantau pembayaran dan status pengiriman.</p></div>
+        <div className="flex gap-6"><div><p className="text-xs text-neutral-400">Total pesanan</p><p className="mt-1 text-lg font-semibold">{orders.length}</p></div><div><p className="text-xs text-neutral-400">Total transaksi berhasil</p><p className="mt-1 text-lg font-semibold">{money(paidTotal)}</p></div></div>
       </div>
 
-      {orders.length === 0 ? (
-        <div className="flex flex-col items-center justify-center text-center py-24 border border-dashed border-neutral-300 rounded-3xl bg-neutral-50/50 shadow-inner">
-          <div className="w-16 h-16 rounded-3xl bg-neutral-900 text-white flex items-center justify-center mb-4 shadow-lg">
-            <ShoppingBag className="w-7 h-7" />
-          </div>
-          <p className="text-sm font-black text-neutral-900 uppercase tracking-wide">No Transactions Recorded</p>
-          <p className="text-xs text-neutral-500 mt-1 max-w-[280px]">
-            You haven&apos;t completed any orders yet. Once you place an order, items and shipment tracking will appear here.
-          </p>
-        </div>
+      {!orders.length ? (
+        <div className="py-16 text-center sm:py-24"><div className="mx-auto grid h-16 w-16 place-items-center rounded-full bg-neutral-100"><Box className="h-6 w-6" /></div><h3 className="mt-5 text-lg font-semibold">Belum ada pesanan</h3><p className="mx-auto mt-2 max-w-sm text-sm leading-6 text-neutral-500">Produk yang kamu checkout akan muncul di sini lengkap dengan status pengirimannya.</p><Link href="/shop" className="mt-6 inline-flex items-center gap-2 rounded-full bg-black px-6 py-3 text-xs font-semibold uppercase tracking-widest text-white">Mulai belanja <ArrowRight className="h-4 w-4" /></Link></div>
       ) : (
-        <div className="space-y-4">
+        <div className="mt-6 space-y-4">
           {orders.map((order) => {
-            return (
-              <div
-                key={order.id}
-                className="p-6 bg-white hover:border-neutral-400 rounded-3xl border border-neutral-200/80 shadow-[0_4px_24px_rgb(0,0,0,0.03)] transition-all space-y-4"
-              >
-                {/* Order Top Bar */}
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-4 border-b border-neutral-100">
-                  <div className="flex items-center gap-3">
-                    <span className="text-xs font-mono font-black uppercase tracking-wider text-neutral-900 bg-neutral-100 px-3 py-1 rounded-xl">
-                      {order.order_number || `#${order.id.slice(0, 8).toUpperCase()}`}
-                    </span>
-                    <span className="text-neutral-300">•</span>
-                    <span className="text-xs font-semibold text-neutral-500">
-                      {new Date(order.created_at).toLocaleDateString("id-ID", {
-                        day: "numeric",
-                        month: "long",
-                        year: "numeric",
-                      })}
-                    </span>
-                  </div>
-
-                  <div className="flex items-center gap-2">
-                    <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider border ${getStatusBadge(order.status)}`}>
-                      Status: {order.status}
-                    </span>
-                    <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider border ${getPaymentBadge(order.payment_status)}`}>
-                      Payment: {order.payment_status}
-                    </span>
-                  </div>
-                </div>
-
-                {/* Order Details Grid */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
-                  <div>
-                    <p className="text-[10px] font-bold uppercase tracking-widest text-neutral-400 mb-1">Total Amount</p>
-                    <p className="text-base font-black text-neutral-900">
-                      Rp {order.total_amount?.toLocaleString("id-ID")}
-                    </p>
-                    <p className="text-neutral-500 mt-0.5">Method: {order.payment_method || "Direct Transfer"}</p>
-                  </div>
-
-                  <div>
-                    <p className="text-[10px] font-bold uppercase tracking-widest text-neutral-400 mb-1">Shipping Destination</p>
-                    <p className="font-bold text-neutral-800 truncate">{order.shipping_address}</p>
-                    <p className="text-neutral-500 mt-0.5">
-                      {order.shipping_city || ""}, {order.shipping_province || ""} {order.shipping_postal_code || ""}
-                    </p>
-                  </div>
-
-                  <div>
-                    <p className="text-[10px] font-bold uppercase tracking-widest text-neutral-400 mb-1">Courier & Tracking</p>
-                    <p className="font-bold text-neutral-800 uppercase">
-                      {order.shipping_courier || "Standard"} ({order.shipping_service || "Regular"})
-                    </p>
-                    <p className="text-neutral-500 font-mono mt-0.5 truncate">
-                      Receipt: {order.shipping_tracking_number || "Awaiting shipment"}
-                    </p>
-                  </div>
-                </div>
+            const meta = statusMeta(order.status);
+            const StatusIcon = meta.icon;
+            return <article key={order.id} className="overflow-hidden rounded-[24px] border border-neutral-200 transition hover:border-neutral-300 hover:shadow-[0_14px_40px_rgba(0,0,0,.05)]">
+              <div className="flex flex-col gap-3 border-b border-neutral-100 bg-neutral-50/70 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+                <div><p className="text-sm font-semibold">#{order.order_number}</p><p className="mt-1 text-xs text-neutral-400">{new Date(order.created_at).toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" })}</p></div>
+                <div className="flex flex-wrap gap-2"><span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[11px] font-semibold ${meta.className}`}><StatusIcon className="h-3.5 w-3.5" />{meta.label}</span><span className={`rounded-full px-3 py-1.5 text-[11px] font-semibold ${order.payment_status === "paid" ? "bg-emerald-50 text-emerald-700" : "bg-neutral-200 text-neutral-600"}`}>{order.payment_status === "paid" ? "Lunas" : "Belum dibayar"}</span></div>
               </div>
-            );
+              <div className="grid gap-5 p-5 sm:grid-cols-[1fr_1.2fr_auto] sm:items-center">
+                <div><p className="text-xs text-neutral-400">Total</p><p className="mt-1 text-lg font-semibold">{money(Number(order.total_amount))}</p><p className="mt-1 text-xs text-neutral-400">{order.payment_method || "Midtrans"}</p></div>
+                <div className="flex gap-3"><MapPin className="mt-0.5 h-4 w-4 shrink-0 text-neutral-400" /><div><p className="line-clamp-1 text-sm font-medium">{order.shipping_address}</p><p className="mt-1 text-xs text-neutral-400">{[order.shipping_city, order.shipping_province, order.shipping_postal_code].filter(Boolean).join(", ")}</p></div></div>
+                <div className="sm:text-right"><p className="text-xs font-semibold uppercase text-neutral-700">{order.shipping_courier || "Kurir belum dipilih"}</p><p className="mt-1 text-xs text-neutral-400">{order.shipping_tracking_number || "Resi belum tersedia"}</p></div>
+              </div>
+            </article>;
           })}
         </div>
       )}

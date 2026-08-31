@@ -202,7 +202,7 @@ export default function Topbar() {
               <div className="overflow-y-auto p-2">
                 {totalResults === 0 && !isSearching ? (
                   <div className="p-4 text-center text-sm text-gray-500">
-                    No results found for <span className="font-semibold text-gray-900">"{searchQuery}"</span>
+                    No results found for <span className="font-semibold text-gray-900">&quot;{searchQuery}&quot;</span>
                   </div>
                 ) : (
                   <div className="space-y-4">

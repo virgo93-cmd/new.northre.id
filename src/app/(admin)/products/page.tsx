@@ -435,7 +435,7 @@ export default function AdminProductsPage() {
               </div>
               <h3 className="text-lg font-bold text-center text-gray-900 mb-2">Delete Product</h3>
               <p className="text-sm text-center text-gray-500">
-                Are you sure you want to delete <span className="font-semibold text-gray-800">"{deleteModal.name}"</span>? 
+                Are you sure you want to delete <span className="font-semibold text-gray-800">&quot;{deleteModal.name}&quot;</span>?
                 This action cannot be undone.
               </p>
             </div>

@@ -13,7 +13,6 @@ export default function AdminReviewsPage() {
 
   const loadData = async () => {
     try {
-      setLoading(true);
       const data = await getReviews();
       setReviews(data);
     } catch (err) {
@@ -25,7 +24,7 @@ export default function AdminReviewsPage() {
   };
 
   useEffect(() => {
-    loadData();
+    queueMicrotask(() => void loadData());
   }, []);
 
   const handleStatusChange = async (id: string, status: "approved" | "pending" | "spam") => {

@@ -1,5 +1,9 @@
 import { createClient } from "@/lib/supabase/client";
 import { Category } from "@/types";
+import type { Database } from "../../../types/database.types";
+
+type CategoryInsert = Database["public"]["Tables"]["categories"]["Insert"];
+type CategoryUpdate = Database["public"]["Tables"]["categories"]["Update"];
 
 export async function getCategories() {
   const supabase = createClient();
@@ -25,18 +29,18 @@ export async function getCategories() {
   }
 
   // 3. Gabungkan dan hitung jumlah produk untuk tiap kategori
-  const rawData = categoriesData.map((cat: any) => {
+  const rawData = categoriesData.map((cat) => {
     // Hitung kemunculan category_id ini di dalam relData
-    const count = relData ? relData.filter((r: any) => r.category_id === cat.id).length : 0;
+    const count = relData ? relData.filter((relation) => relation.category_id === cat.id).length : 0;
     return { ...cat, product_count: count };
   });
 
   // 4. Akumulasi jumlah produk dari Child ke Parent-nya
-  const formattedData = rawData.map((cat: any) => {
+  const formattedData = rawData.map((cat) => {
     if (!cat.parent_id) {
       const childrenTotal = rawData
-        .filter((c: any) => c.parent_id === cat.id)
-        .reduce((sum: number, c: any) => sum + c.product_count, 0);
+        .filter((child) => child.parent_id === cat.id)
+        .reduce((sum, child) => sum + child.product_count, 0);
       
       return {
         ...cat,
@@ -46,10 +50,10 @@ export async function getCategories() {
     return cat;
   });
 
-  return formattedData as any[];
+  return formattedData;
 }
 
-export async function createCategory(categoryData: Partial<Category>) {
+export async function createCategory(categoryData: CategoryInsert) {
   const supabase = createClient();
   const { data, error } = await supabase
     .from("categories")
@@ -64,7 +68,7 @@ export async function createCategory(categoryData: Partial<Category>) {
   return data as Category;
 }
 
-export async function updateCategory(id: string, categoryData: Partial<Category>) {
+export async function updateCategory(id: string, categoryData: CategoryUpdate) {
   const supabase = createClient();
   const { data, error } = await supabase
     .from("categories")

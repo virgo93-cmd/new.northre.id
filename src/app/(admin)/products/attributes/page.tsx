@@ -28,7 +28,6 @@ export default function AdminAttributesPage() {
 
   const loadData = async () => {
     try {
-      setLoading(true);
       const data = await getAttributes();
       setAttributes(data);
     } catch (err) {
@@ -39,7 +38,7 @@ export default function AdminAttributesPage() {
   };
 
   useEffect(() => {
-    loadData();
+    queueMicrotask(() => void loadData());
   }, []);
 
   const handleAttrNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {

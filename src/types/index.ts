@@ -105,9 +105,9 @@ export interface Category {
   parent_id?: string | null;
   description?: string | null;
   image_url?: string | null;
-  created_at: string;
+  created_at: string | null;
   // Relasi opsional jika di-join di query
-  parent?: Category | null;
+  parent?: { id?: string; name: string; slug?: string } | null;
   children?: Category[];
 }
 

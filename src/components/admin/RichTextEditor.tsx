@@ -45,7 +45,6 @@ export default function RichTextEditor({ value, onChange, placeholder }: RichTex
   useEffect(() => {
     if (editor && value !== editor.getHTML() && !isCodeView) {
       editor.commands.setContent(value);
-      setRawHtml(value);
     }
   }, [value, editor, isCodeView]);
 

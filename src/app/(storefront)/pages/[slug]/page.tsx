@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Metadata } from "next";
+import { sanitizeRichText } from "@/lib/sanitize-rich-text";
 
 interface PageProps {
   params: Promise<{ slug: string }>;
@@ -62,7 +63,7 @@ export default async function CustomPageView({ params }: PageProps) {
         {/* Konten Rich Text dari CMS */}
         <div 
           className="prose prose-neutral max-w-none text-[14px] sm:text-[15px] leading-relaxed text-[#444] space-y-6"
-          dangerouslySetInnerHTML={{ __html: page.content }}
+          dangerouslySetInnerHTML={{ __html: sanitizeRichText(page.content) }}
         />
       </div>
     </main>

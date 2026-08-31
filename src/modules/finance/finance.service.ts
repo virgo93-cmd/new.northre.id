@@ -68,7 +68,7 @@ export async function getFinancialOverview(): Promise<FinancialOverview> {
   // 2. Total Wallet Balance in Circulation
   const { data: wallets } = await supabase
     .from("wallets")
-    .select("balance, total_earned");
+    .select("balance");
 
   const totalWalletsBalance = (wallets || []).reduce(
     (acc, item) => acc + Number(item.balance || 0),

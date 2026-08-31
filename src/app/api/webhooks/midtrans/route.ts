@@ -17,9 +17,12 @@ export async function POST(req: NextRequest) {
     } = body;
 
     // 1. Inisialisasi Supabase Admin Client
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
-    const supabaseServiceKey =
-      process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "";
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    if (!supabaseUrl || !supabaseServiceKey) {
+      console.error("Midtrans webhook is missing its Supabase server configuration.");
+      return NextResponse.json({ error: "Webhook is not configured." }, { status: 503 });
+    }
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
     // 2. Ambil Server Key dari database (fallback ke constants / env)
@@ -35,6 +38,11 @@ export async function POST(req: NextRequest) {
       process.env.MIDTRANS_SERVER_KEY ||
       "";
 
+    if (!serverKey) {
+      console.error("Midtrans webhook server key is not configured.");
+      return NextResponse.json({ error: "Webhook is not configured." }, { status: 503 });
+    }
+
     // 3. Verifikasi Keamanan Signature Key (SHA512)
     const payloadToHash = `${order_id}${status_code}${gross_amount}${serverKey}`;
     const calculatedSignature = crypto
@@ -42,7 +50,13 @@ export async function POST(req: NextRequest) {
       .update(payloadToHash)
       .digest("hex");
 
-    if (calculatedSignature !== signature_key) {
+    const calculatedBuffer = Buffer.from(calculatedSignature, "utf8");
+    const receivedBuffer = Buffer.from(String(signature_key ?? ""), "utf8");
+    const signatureIsValid =
+      calculatedBuffer.length === receivedBuffer.length &&
+      crypto.timingSafeEqual(calculatedBuffer, receivedBuffer);
+
+    if (!signatureIsValid) {
       return NextResponse.json(
         { error: "Invalid signature key." },
         { status: 403 }
@@ -52,7 +66,7 @@ export async function POST(req: NextRequest) {
     // 4. Cari pesanan berdasarkan nomor order
     const { data: order, error: orderError } = await supabase
       .from("orders")
-      .select("id, status, payment_status, total_amount, user_id")
+      .select("id, status, payment_status, total_amount, customer_id")
       .eq("order_number", order_id)
       .maybeSingle();
 
@@ -105,17 +119,31 @@ export async function POST(req: NextRequest) {
     }
 
     // 7. Catat mutasi ledger jika order lunas dan ada akun user
-    if (newPaymentStatus === "paid" && order.user_id) {
+    if (newPaymentStatus === "paid" && order.customer_id) {
+      const { data: existingTransaction } = await supabase
+        .from("wallet_transactions")
+        .select("id")
+        .eq("reference_id", order.id)
+        .eq("type", "order_payment")
+        .maybeSingle();
+
+      if (existingTransaction) {
+        return NextResponse.json({
+          success: true,
+          message: `Webhook already processed for Order #${order_id}.`,
+        });
+      }
+
       const { data: wallet } = await supabase
         .from("wallets")
         .select("id")
-        .eq("user_id", order.user_id)
+        .eq("user_id", order.customer_id)
         .maybeSingle();
 
       if (wallet) {
         await supabase.from("wallet_transactions").insert({
           wallet_id: wallet.id,
-          user_id: order.user_id,
+          user_id: order.customer_id,
           amount: Number(order.total_amount),
           type: "order_payment",
           description: `Settled payment for order #${order_id}`,
@@ -128,10 +156,10 @@ export async function POST(req: NextRequest) {
       success: true,
       message: `Webhook processed: Order #${order_id} is now ${newPaymentStatus}.`,
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Midtrans Webhook Error:", error);
     return NextResponse.json(
-      { error: error.message || "Internal server error." },
+      { error: error instanceof Error ? error.message : "Internal server error." },
       { status: 500 }
     );
   }

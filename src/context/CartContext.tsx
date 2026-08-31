@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, useContext, useState, useEffect, ReactNode } from "react";
+import React, { createContext, useContext, useState, useEffect, useRef, ReactNode } from "react";
 
 export interface CartItem {
   id: string;
@@ -11,6 +11,9 @@ export interface CartItem {
   image?: string;
   image_url?: string;
   selectedAttributes?: Record<string, string>;
+  regular_price?: number | string;
+  regularPrice?: number | string;
+  originalPrice?: number | string;
 }
 
 interface CartContextType {
@@ -26,27 +29,29 @@ const CartContext = createContext<CartContextType | undefined>(undefined);
 
 export function CartProvider({ children }: { children: ReactNode }) {
   const [cart, setCart] = useState<CartItem[]>([]);
-  const [isMounted, setIsMounted] = useState(false);
+  const hasHydrated = useRef(false);
 
   // Load keranjang dari LocalStorage saat web pertama kali dibuka
   useEffect(() => {
-    setIsMounted(true);
-    const savedCart = localStorage.getItem("northre_cart");
-    if (savedCart) {
-      try {
-        setCart(JSON.parse(savedCart));
-      } catch (e) {
-        console.error("Gagal load keranjang", e);
+    queueMicrotask(() => {
+      const savedCart = localStorage.getItem("northre_cart");
+      if (savedCart) {
+        try {
+          setCart(JSON.parse(savedCart) as CartItem[]);
+        } catch (error: unknown) {
+          console.error("Gagal load keranjang", error);
+        }
       }
-    }
+      hasHydrated.current = true;
+    });
   }, []);
 
   // Simpan keranjang ke LocalStorage setiap ada perubahan
   useEffect(() => {
-    if (isMounted) {
+    if (hasHydrated.current) {
       localStorage.setItem("northre_cart", JSON.stringify(cart));
     }
-  }, [cart, isMounted]);
+  }, [cart]);
 
   const addToCart = (item: CartItem) => {
     setCart((prev) => {
@@ -56,9 +61,11 @@ export function CartProvider({ children }: { children: ReactNode }) {
       );
 
       if (existingItemIndex > -1) {
-        const newCart = [...prev];
-        newCart[existingItemIndex].quantity += item.quantity;
-        return newCart;
+        return prev.map((existingItem, index) =>
+          index === existingItemIndex
+            ? { ...existingItem, quantity: existingItem.quantity + item.quantity }
+            : existingItem,
+        );
       }
       return [...prev, item];
     });

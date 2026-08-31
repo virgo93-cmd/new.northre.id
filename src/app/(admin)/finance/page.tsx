@@ -41,7 +41,6 @@ export default function AdminFinancePage() {
 
   const loadFinanceData = useCallback(async () => {
     try {
-      setLoading(true);
       const [overviewData, withdrawalsData, transactionsData] = await Promise.all([
         getFinancialOverview(),
         getWithdrawalRequests(),
@@ -58,7 +57,7 @@ export default function AdminFinancePage() {
   }, []);
 
   useEffect(() => {
-    loadFinanceData();
+    queueMicrotask(() => void loadFinanceData());
   }, [loadFinanceData]);
 
   const handleOpenReview = (req: WithdrawalRequest) => {

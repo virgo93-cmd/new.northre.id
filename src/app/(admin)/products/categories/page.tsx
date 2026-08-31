@@ -30,7 +30,6 @@ export default function AdminCategoriesPage() {
 
   const loadData = async () => {
     try {
-      setLoading(true);
       const data = await getCategories();
       setCategories(data);
     } catch (err) {
@@ -41,7 +40,7 @@ export default function AdminCategoriesPage() {
   };
 
   useEffect(() => {
-    loadData();
+    queueMicrotask(() => void loadData());
   }, []);
 
   const treeCategories = useMemo(() => {

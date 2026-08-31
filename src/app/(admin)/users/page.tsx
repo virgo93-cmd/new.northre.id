@@ -11,7 +11,6 @@ import {
   X,
   CheckCircle2,
   Edit,
-  UserCheck,
 } from "lucide-react";
 import {
   getUsers,
@@ -124,12 +123,6 @@ export default function AdminUsersPage() {
             <Shield className="h-3 w-3" /> Admin
           </span>
         );
-      case "staff":
-        return (
-          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200">
-            <UserCheck className="h-3 w-3" /> Staff
-          </span>
-        );
       default:
         return (
           <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-50 text-gray-600 border border-gray-200">
@@ -182,7 +175,6 @@ export default function AdminUsersPage() {
         >
           <option value="all">All Roles</option>
           <option value="admin">Admin</option>
-          <option value="staff">Staff</option>
           <option value="customer">Customer</option>
         </select>
 
@@ -414,7 +406,6 @@ export default function AdminUsersPage() {
                     className="w-full p-2 border border-gray-300 rounded-lg text-xs bg-white focus:ring-blue-500 focus:border-blue-500"
                   >
                     <option value="customer">Customer</option>
-                    <option value="staff">Staff</option>
                     <option value="admin">Admin</option>
                   </select>
                 </div>
@@ -470,7 +461,7 @@ export default function AdminUsersPage() {
                         <div className="flex items-center justify-between">
                           <span className="font-semibold text-gray-900 flex items-center gap-1.5">
                             {addr.label}
-                            {addr.is_primary && (
+                            {addr.is_default && (
                               <span className="px-1.5 py-0.5 rounded bg-blue-100 text-blue-700 text-[10px] font-bold">
                                 PRIMARY
                               </span>
@@ -478,7 +469,7 @@ export default function AdminUsersPage() {
                           </span>
                           <span className="text-gray-500">{addr.phone_number}</span>
                         </div>
-                        <p className="text-gray-600">{addr.full_address}</p>
+                        <p className="text-gray-600">{addr.street_address}</p>
                         <p className="text-gray-400 text-[11px]">
                           {[addr.city, addr.province, addr.postal_code].filter(Boolean).join(", ")}
                         </p>

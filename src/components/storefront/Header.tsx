@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo } from "react";
 import Link from "next/link";
 import { NavigationDrawer } from "./NavigationDrawer";
 import { Search, X, Package } from "lucide-react";
@@ -21,12 +21,6 @@ export default function Header({ logoUrl, siteName, categories = [], navItems = 
   
   // Cart Integration & Hydration state
   const { cart } = useCart();
-  const [isMounted, setIsMounted] = useState(false);
-
-  useEffect(() => {
-    setIsMounted(true);
-  }, []);
-
   const totalCartItems = cart.reduce((total, item) => total + item.quantity, 0);
 
   const displayLogo = logoUrl || "/northre_logo.png";
@@ -92,7 +86,7 @@ export default function Header({ logoUrl, siteName, categories = [], navItems = 
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
               </svg>
               {/* Badge cuma muncul saat mounted & barang > 0 */}
-              {isMounted && totalCartItems > 0 && (
+              {totalCartItems > 0 && (
                 <span className="absolute top-0 right-0 flex h-[15px] w-[15px] -translate-y-0.5 translate-x-0.5 items-center justify-center rounded-full bg-black text-[9px] font-bold text-white shadow-sm ring-2 ring-white">
                   {totalCartItems}
                 </span>

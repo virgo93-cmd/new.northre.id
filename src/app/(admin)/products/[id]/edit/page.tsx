@@ -27,6 +27,10 @@ import TagsSidebar from "@/components/admin/product-new/TagsSidebar";
 import FeaturedImageCard from "@/components/admin/product-new/FeaturedImageCard";
 import GalleryCard from "@/components/admin/product-new/GalleryCard";
 
+const isProductType = (value: string): value is ProductType => value === "simple" || value === "variable";
+const isProductStatus = (value: string): value is ProductStatus => ["publish", "draft", "private"].includes(value);
+const isStockStatus = (value: string): value is StockStatus => value === "instock" || value === "outofstock";
+
 export default function EditProductPage() {
   const router = useRouter();
   const params = useParams();
@@ -94,12 +98,12 @@ export default function EditProductPage() {
         if (productData) {
           setName(productData.name || "");
           setSlug(productData.slug || "");
-          setType(productData.type || "simple");
-          setStatus(productData.status || "draft");
+          setType(isProductType(productData.type) ? productData.type : "simple");
+          setStatus(isProductStatus(productData.status) ? productData.status : "draft");
           setRegularPrice(productData.regular_price ? String(productData.regular_price) : "");
           setSalePrice(productData.sale_price ? String(productData.sale_price) : "");
           setSku(productData.sku || "");
-          setStockStatus(productData.stock_status || "instock");
+          setStockStatus(isStockStatus(productData.stock_status) ? productData.stock_status : "instock");
           setStockQuantity(productData.stock_quantity ? String(productData.stock_quantity) : "0");
           setDescription(productData.description || "");
           setImageUrl(productData.image_url || "");

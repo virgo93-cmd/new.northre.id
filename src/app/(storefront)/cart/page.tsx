@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useCart } from "@/context/CartContext";
@@ -8,12 +8,6 @@ import { useCart } from "@/context/CartContext";
 export default function CartPage() {
   const { cart, removeFromCart, updateQuantity, subtotal } = useCart();
   const [orderNote, setOrderNote] = useState("");
-  const [isMounted, setIsMounted] = useState(false);
-
-  // FIX: Tunggu komponen di-mount di browser untuk menghindari Hydration Mismatch
-  useEffect(() => {
-    setIsMounted(true);
-  }, []);
 
   const formatRupiah = (amount: number | string) => {
     const num = typeof amount === "string" ? parseFloat(amount.replace(/[^0-9.-]+/g, "")) || 0 : amount;
@@ -24,15 +18,6 @@ export default function CartPage() {
     if (typeof priceStr === "number") return priceStr;
     return parseFloat(priceStr.replace(/[^0-9.-]+/g, "")) || 0;
   };
-
-  // Selama belum mounted, tampilkan layar loading yang clean
-  if (!isMounted) {
-    return (
-      <div className="min-h-[75vh] flex items-center justify-center bg-white">
-        <p className="text-xs font-bold tracking-[0.2em] text-neutral-400 uppercase">LOADING CART...</p>
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-[75vh] bg-white px-4 py-8 sm:px-6 sm:py-16 lg:px-8">

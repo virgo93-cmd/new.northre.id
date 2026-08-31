@@ -36,13 +36,8 @@ export default function StorefrontFooterPage() {
     youtube_url: "",
   });
 
-  useEffect(() => {
-    loadData();
-  }, []);
-
   async function loadData() {
     try {
-      setLoading(true);
       // Ambil data settings footer dan daftar halaman secara paralel
       const [settingsData, pagesData] = await Promise.all([
         getFooterSettings(),
@@ -54,12 +49,16 @@ export default function StorefrontFooterPage() {
         information_links: settingsData.information_links || [],
       });
       setAvailablePages(pagesData);
-    } catch (err: any) {
-      setErrorMsg("Failed to load footer settings: " + err.message);
+    } catch (error: unknown) {
+      setErrorMsg(`Failed to load footer settings: ${error instanceof Error ? error.message : "Unknown error"}`);
     } finally {
       setLoading(false);
     }
   }
+
+  useEffect(() => {
+    queueMicrotask(() => void loadData());
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -69,8 +68,8 @@ export default function StorefrontFooterPage() {
       setSuccessMsg(null);
       await updateFooterSettings(formData);
       setSuccessMsg("Footer settings saved successfully!");
-    } catch (err: any) {
-      setErrorMsg("Failed to save footer settings: " + err.message);
+    } catch (error: unknown) {
+      setErrorMsg(`Failed to save footer settings: ${error instanceof Error ? error.message : "Unknown error"}`);
     } finally {
       setSaving(false);
     }

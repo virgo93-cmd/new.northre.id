@@ -87,12 +87,12 @@ export default function AddNewProductPage() {
         console.error("Failed to load metadata", err);
       }
     }
-    loadMetaData();
+    queueMicrotask(() => void loadMetaData());
   }, []);
 
   // Variant Generator Logic (Kombinasi Otomatis)
   useEffect(() => {
-    setVariants((prevVariants) => {
+    queueMicrotask(() => setVariants((prevVariants) => {
       if (selectedAttributes.length === 0) return [];
 
       const activeAttributes = selectedAttributes.filter((a) => a.terms.length > 0);
@@ -136,13 +136,12 @@ export default function AddNewProductPage() {
           is_active: existing ? existing.is_active : true,
         };
       });
-    });
+    }));
   }, [selectedAttributes, attributesList]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      setLoading(true);
       setErrorMsg(null);
 
       if (!name) {

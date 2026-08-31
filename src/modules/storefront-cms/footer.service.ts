@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/client";
+import type { Database, Json } from "../../../types/database.types";
 
 // Interface khusus untuk format link navigasi
 export interface FooterLink {
@@ -30,6 +31,38 @@ export interface PageOption {
 }
 
 const DEFAULT_FOOTER_ID = "00000000-0000-0000-0000-000000000001";
+
+function parseFooterLinks(value: Json): FooterLink[] {
+  if (!Array.isArray(value)) return [];
+
+  return value.flatMap((item) => {
+    if (typeof item !== "object" || item === null || Array.isArray(item)) return [];
+    const label = item.label;
+    const url = item.url;
+    return typeof label === "string" && typeof url === "string" ? [{ label, url }] : [];
+  });
+}
+
+function mapFooterSettings(data: DatabaseFooterSettings): FooterSettings {
+  return {
+    id: data.id,
+    description: data.description ?? "",
+    trademark_text: data.trademark_text ?? "",
+    operational_hours: data.operational_hours ?? "",
+    information_links: parseFooterLinks(data.information_links),
+    copyright_text: data.copyright_text ?? "",
+    contact_email: data.contact_email ?? "",
+    contact_phone: data.contact_phone ?? "",
+    contact_address: data.contact_address ?? "",
+    instagram_url: data.instagram_url ?? "",
+    tiktok_url: data.tiktok_url ?? "",
+    facebook_url: data.facebook_url ?? "",
+    twitter_url: data.twitter_url ?? "",
+    youtube_url: data.youtube_url ?? "",
+  };
+}
+
+type DatabaseFooterSettings = Database["public"]["Tables"]["store_footer_settings"]["Row"];
 
 export async function getFooterSettings(): Promise<FooterSettings> {
   const supabase = createClient();
@@ -64,16 +97,18 @@ export async function getFooterSettings(): Promise<FooterSettings> {
     };
   }
 
-  return data as FooterSettings;
+  return mapFooterSettings(data);
 }
 
 export async function updateFooterSettings(settings: FooterSettings) {
   const supabase = createClient();
+  const { information_links, ...scalarSettings } = settings;
   const { data, error } = await supabase
     .from("store_footer_settings")
     .upsert({
       id: DEFAULT_FOOTER_ID,
-      ...settings,
+      ...scalarSettings,
+      information_links: (information_links ?? []).map(({ label, url }) => ({ label, url })),
       updated_at: new Date().toISOString(),
     })
     .select()
@@ -83,7 +118,7 @@ export async function updateFooterSettings(settings: FooterSettings) {
     throw new Error(error.message);
   }
 
-  return data as FooterSettings;
+  return data ? mapFooterSettings(data) : null;
 }
 
 // BARU: Fungsi untuk mengambil daftar halaman dari tabel store_pages untuk pilihan dropdown footer

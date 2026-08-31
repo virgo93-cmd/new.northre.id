@@ -3,6 +3,7 @@ import ProductDetailView from "@/components/storefront/ProductDetailView";
 import RelatedProducts from "@/components/storefront/RelatedProducts";
 import { notFound } from "next/navigation";
 import { Metadata } from "next";
+import { sanitizeRichText } from "@/lib/sanitize-rich-text";
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -38,7 +39,12 @@ export default async function ProductDetailPage({ params }: PageProps) {
   return (
     <main className="w-full bg-white py-10 md:py-16">
       <div className="mx-auto max-w-[1440px] px-4 sm:px-6 lg:px-8">
-        <ProductDetailView product={product} />
+        <ProductDetailView
+          product={{
+            ...product,
+            description: sanitizeRichText(product.description),
+          }}
+        />
       </div>
 
       {/* Bagian You May Also Like */}

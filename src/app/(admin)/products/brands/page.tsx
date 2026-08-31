@@ -22,7 +22,6 @@ export default function AdminBrandsPage() {
 
   const loadData = async () => {
     try {
-      setLoading(true);
       const data = await getBrands();
       setBrands(data);
     } catch (err) {
@@ -33,7 +32,7 @@ export default function AdminBrandsPage() {
   };
 
   useEffect(() => {
-    loadData();
+    queueMicrotask(() => void loadData());
   }, []);
 
   const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {

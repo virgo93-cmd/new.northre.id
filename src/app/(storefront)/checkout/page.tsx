@@ -1,12 +1,49 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, type ChangeEvent, type FormEvent } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import Script from "next/script";
 import { useCart } from "@/context/CartContext";
+import type { CartItem } from "@/context/CartContext";
+import { useRouter } from "next/navigation";
+
+interface Region {
+  id: string;
+  name: string;
+}
+
+interface ShippingRate {
+  courier: string;
+  price: number;
+  estimatedDate?: string;
+  unsupported?: boolean;
+  quoteToken: string;
+}
+
+interface MengantarLocation {
+  _id: string;
+  CITY_NAME?: string;
+  PROVINCE_NAME?: string;
+  SUBDISTRICT_NAME?: string;
+  ZIP_CODE?: string;
+}
+
+interface SnapPaymentCallbacks {
+  onSuccess: () => void;
+  onPending: () => void;
+  onError: () => void;
+  onClose: () => void;
+}
+
+declare global {
+  interface Window {
+    snap?: { pay: (token: string, callbacks: SnapPaymentCallbacks) => void };
+  }
+}
 
 export default function CheckoutPage() {
+  const router = useRouter();
   const { cart, subtotal, clearCart } = useCart();
 
   const [formData, setFormData] = useState({
@@ -24,19 +61,19 @@ export default function CheckoutPage() {
   });
 
   // State Wilayah Berjenjang
-  const [provinces, setProvinces] = useState<any[]>([]);
-  const [cities, setCities] = useState<any[]>([]);
-  const [districts, setDistricts] = useState<any[]>([]);
+  const [provinces, setProvinces] = useState<Region[]>([]);
+  const [cities, setCities] = useState<Region[]>([]);
+  const [districts, setDistricts] = useState<Region[]>([]);
 
   const [selectedProvince, setSelectedProvince] = useState("");
   const [selectedCity, setSelectedCity] = useState("");
   const [selectedDistrict, setSelectedDistrict] = useState("");
   
   // State Ekspedisi & Dropdown Kurir Lainnya
-  const [shippingRates, setShippingRates] = useState<any[]>([]);
+  const [shippingRates, setShippingRates] = useState<ShippingRate[]>([]);
   const [isLoadingRates, setIsLoadingRates] = useState(false);
-  const [selectedRate, setSelectedRate] = useState<any>(null);
-  const [mengantarLocation, setMengantarLocation] = useState<any>(null);
+  const [selectedRate, setSelectedRate] = useState<ShippingRate | null>(null);
+  const [mengantarLocation, setMengantarLocation] = useState<MengantarLocation | null>(null);
   const [showAllCouriers, setShowAllCouriers] = useState(false);
   
   // Mobile Order Summary Toggle State
@@ -54,7 +91,7 @@ export default function CheckoutPage() {
   };
 
   // Helper render harga keranjang (Mendukung Strikethrough Discount)
-  const renderCartItemPrice = (item: any) => {
+  const renderCartItemPrice = (item: CartItem) => {
     const currentPrice = typeof item.price === "string" ? parseFloat(item.price.replace(/[^0-9.-]+/g, "")) : item.price;
     // Cari regular price jika tersedia (pastikan dari CartContext di-passing)
     const regPrice = item.regular_price || item.regularPrice || item.originalPrice || 0;
@@ -71,7 +108,7 @@ export default function CheckoutPage() {
     return <span className="text-[13px] font-medium text-black whitespace-nowrap">{formatRupiah(currentPrice)}</span>;
   };
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+  const handleInputChange = (e: ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value, type } = e.target;
     if (type === "checkbox") {
       const checked = (e.target as HTMLInputElement).checked;
@@ -81,56 +118,7 @@ export default function CheckoutPage() {
     }
   };
 
-  useEffect(() => {
-    fetch("https://www.emsifa.com/api-wilayah-indonesia/api/provinces.json")
-      .then((res) => res.json())
-      .then((data) => setProvinces(data))
-      .catch(() => console.error("Failed to load provinces"));
-  }, []);
-
-  useEffect(() => {
-    setSelectedCity("");
-    setSelectedDistrict("");
-    setCities([]);
-    setDistricts([]);
-    setShippingRates([]);
-    setSelectedRate(null);
-
-    if (selectedProvince) {
-      const provId = provinces.find((p) => p.name === selectedProvince)?.id;
-      if (provId) {
-        fetch(`https://www.emsifa.com/api-wilayah-indonesia/api/regencies/${provId}.json`)
-          .then((res) => res.json())
-          .then((data) => setCities(data));
-      }
-    }
-  }, [selectedProvince, provinces]);
-
-  useEffect(() => {
-    setSelectedDistrict("");
-    setDistricts([]);
-    setShippingRates([]);
-    setSelectedRate(null);
-
-    if (selectedCity) {
-      const cityId = cities.find((c) => c.name === selectedCity)?.id;
-      if (cityId) {
-        fetch(`https://www.emsifa.com/api-wilayah-indonesia/api/districts/${cityId}.json`)
-          .then((res) => res.json())
-          .then((data) => setDistricts(data));
-      }
-    }
-  }, [selectedCity, cities]);
-
-  useEffect(() => {
-    if (selectedProvince && selectedCity && selectedDistrict) {
-      const cleanCity = selectedCity.replace(/^(KOTA|KABUPATEN)\s+/i, "");
-      const keyword = `${selectedDistrict} ${cleanCity}`;
-      fetchMengantarRates(keyword);
-    }
-  }, [selectedDistrict]);
-
-  const fetchMengantarRates = async (keyword: string) => {
+  const fetchMengantarRates = useCallback(async (keyword: string) => {
     setIsLoadingRates(true);
     setErrorMessage("");
     setShippingRates([]);
@@ -143,41 +131,104 @@ export default function CheckoutPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: "searchLocation", keyword }),
       });
-      const searchData = await searchRes.json();
+      const searchData = (await searchRes.json()) as { data?: MengantarLocation[] };
 
-      if (searchData.data && searchData.data.length > 0) {
+      if (searchData.data?.length) {
         const bestMatch = searchData.data[0];
         setMengantarLocation(bestMatch);
-        
+
         const rateRes = await fetch("/api/shipping", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ action: "getRates", destination_id: bestMatch._id }),
+          body: JSON.stringify({
+            action: "getRates",
+            destination_id: bestMatch._id,
+            items: cart.map(({ id, quantity }) => ({ id, quantity })),
+            location: bestMatch,
+          }),
         });
-        const rateData = await rateRes.json();
+        const rateData = (await rateRes.json()) as {
+          success?: boolean;
+          data?: Record<string, Omit<ShippingRate, "courier">>;
+        };
 
         if (rateData.success && rateData.data) {
-          let ratesArray = Object.keys(rateData.data)
-            .map((key) => ({ courier: key, ...rateData.data[key] }))
+          const ratesArray = Object.entries(rateData.data)
+            .map(([courier, rate]) => ({ courier, ...rate }))
             .filter((rate) => !rate.unsupported && rate.price > 0)
-            .filter((rate) => !rate.courier.toUpperCase().includes("TESTING") && !rate.courier.toUpperCase().includes("INTERNAL"));
-          
-          ratesArray.sort((a, b) => a.price - b.price);
-          
+            .filter((rate) => !rate.courier.toUpperCase().includes("TESTING") && !rate.courier.toUpperCase().includes("INTERNAL"))
+            .sort((a, b) => a.price - b.price);
+
           setShippingRates(ratesArray);
-          if (ratesArray.length > 0) setSelectedRate(ratesArray[0]);
+          setSelectedRate(ratesArray[0] ?? null);
         }
       } else {
         setErrorMessage("Courier services do not cover this district yet.");
       }
-    } catch (error) {
+    } catch {
       setErrorMessage("An error occurred while calculating shipping rates.");
     } finally {
       setIsLoadingRates(false);
     }
+  }, [cart]);
+
+  useEffect(() => {
+    fetch("https://www.emsifa.com/api-wilayah-indonesia/api/provinces.json")
+      .then((res) => res.json())
+      .then((data) => setProvinces(data))
+      .catch(() => console.error("Failed to load provinces"));
+  }, []);
+
+  useEffect(() => {
+    if (selectedProvince) {
+      const provId = provinces.find((p) => p.name === selectedProvince)?.id;
+      if (provId) {
+        fetch(`https://www.emsifa.com/api-wilayah-indonesia/api/regencies/${provId}.json`)
+          .then((res) => res.json())
+          .then((data) => setCities(data));
+      }
+    }
+  }, [selectedProvince, provinces]);
+
+  useEffect(() => {
+    if (selectedCity) {
+      const cityId = cities.find((c) => c.name === selectedCity)?.id;
+      if (cityId) {
+        fetch(`https://www.emsifa.com/api-wilayah-indonesia/api/districts/${cityId}.json`)
+          .then((res) => res.json())
+          .then((data) => setDistricts(data));
+      }
+    }
+  }, [selectedCity, cities]);
+
+  const handleProvinceChange = (event: ChangeEvent<HTMLSelectElement>) => {
+    setSelectedProvince(event.target.value);
+    setSelectedCity("");
+    setSelectedDistrict("");
+    setCities([]);
+    setDistricts([]);
+    setShippingRates([]);
+    setSelectedRate(null);
   };
 
-  const handlePayNow = async (e: React.FormEvent) => {
+  const handleCityChange = (event: ChangeEvent<HTMLSelectElement>) => {
+    setSelectedCity(event.target.value);
+    setSelectedDistrict("");
+    setDistricts([]);
+    setShippingRates([]);
+    setSelectedRate(null);
+  };
+
+  const handleDistrictChange = (event: ChangeEvent<HTMLSelectElement>) => {
+    const district = event.target.value;
+    setSelectedDistrict(district);
+    if (selectedProvince && selectedCity && district) {
+      const cleanCity = selectedCity.replace(/^(KOTA|KABUPATEN)\s+/i, "");
+      void fetchMengantarRates(`${district} ${cleanCity}`);
+    }
+  };
+
+  const handlePayNow = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setErrorMessage("");
 
@@ -210,23 +261,23 @@ export default function CheckoutPage() {
             shippingMethodName: `${selectedRate.courier} (${selectedRate.estimatedDate || "-"})`
           },
           items: cart,
-          totalAmount,
+          shippingQuoteToken: selectedRate.quoteToken,
         }),
       });
 
       const data = await res.json();
       if (!res.ok || !data.token) throw new Error(data.message || "Failed to process payment");
 
-      if ((window as any).snap) {
-        (window as any).snap.pay(data.token, {
-          onSuccess: () => { clearCart(); window.location.href = `/order-success?order_id=${data.orderId}`; },
-          onPending: () => { clearCart(); window.location.href = `/order-success?order_id=${data.orderId}`; },
+      if (window.snap) {
+        window.snap.pay(data.token, {
+          onSuccess: () => { clearCart(); router.push(`/order-success?order_id=${data.orderId}`); },
+          onPending: () => { clearCart(); router.push(`/order-success?order_id=${data.orderId}`); },
           onError: () => setErrorMessage("Payment failed. Please try again."),
           onClose: () => setIsLoading(false),
         });
       }
-    } catch (err: any) {
-      setErrorMessage(err.message || "System error encountered.");
+    } catch (error: unknown) {
+      setErrorMessage(error instanceof Error ? error.message : "System error encountered.");
       setIsLoading(false);
     }
   };
@@ -336,7 +387,7 @@ export default function CheckoutPage() {
                   <div className="relative">
                     <select
                       value={selectedProvince}
-                      onChange={(e) => setSelectedProvince(e.target.value)}
+                      onChange={handleProvinceChange}
                       className="w-full rounded-md border border-neutral-300 bg-white px-3 py-3 text-[13px] text-neutral-900 focus:border-black focus:ring-1 focus:ring-black focus:outline-none appearance-none cursor-pointer transition-all"
                     >
                       <option value="">Select Province</option>
@@ -353,7 +404,7 @@ export default function CheckoutPage() {
                   <div className="relative">
                     <select
                       value={selectedCity}
-                      onChange={(e) => setSelectedCity(e.target.value)}
+                      onChange={handleCityChange}
                       disabled={!selectedProvince}
                       className="w-full rounded-md border border-neutral-300 bg-white px-3 py-3 text-[13px] text-neutral-900 focus:border-black focus:ring-1 focus:ring-black focus:outline-none appearance-none disabled:bg-neutral-50 disabled:text-neutral-400 disabled:cursor-not-allowed cursor-pointer transition-all"
                     >
@@ -372,7 +423,7 @@ export default function CheckoutPage() {
                     <div className="relative">
                       <select
                         value={selectedDistrict}
-                        onChange={(e) => setSelectedDistrict(e.target.value)}
+                        onChange={handleDistrictChange}
                         disabled={!selectedCity}
                         className="w-full rounded-md border border-neutral-300 bg-white px-3 py-3 text-[13px] text-neutral-900 focus:border-black focus:ring-1 focus:ring-black focus:outline-none appearance-none disabled:bg-neutral-50 disabled:text-neutral-400 disabled:cursor-not-allowed cursor-pointer transition-all"
                       >

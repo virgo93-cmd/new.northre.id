@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Plus, Trash2, Hash, Loader2 } from "lucide-react";
+import { Trash2, Hash, Loader2 } from "lucide-react";
 import { getTags, createTag, deleteTag } from "@/modules/products/tag.service";
 import { Tag } from "@/types";
 
@@ -14,11 +14,9 @@ export default function AdminTagsPage() {
   // Form State
   const [name, setName] = useState("");
   const [slug, setSlug] = useState("");
-  const [description, setDescription] = useState("");
 
   const loadData = async () => {
     try {
-      setLoading(true);
       const data = await getTags();
       setTags(data);
     } catch (err) {
@@ -29,7 +27,7 @@ export default function AdminTagsPage() {
   };
 
   useEffect(() => {
-    loadData();
+    queueMicrotask(() => void loadData());
   }, []);
 
   const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -53,12 +51,10 @@ export default function AdminTagsPage() {
       await createTag({
         name,
         slug: slug || name.toLowerCase().replace(/[^a-z0-9]+/g, "-"),
-        description: description || null,
       });
 
       setName("");
       setSlug("");
-      setDescription("");
       loadData();
     } catch (err: any) {
       setErrorMsg(err.message || "Failed to create tag");
@@ -118,17 +114,6 @@ export default function AdminTagsPage() {
               />
             </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700">Description</label>
-              <textarea
-                rows={3}
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                placeholder="Tag description..."
-                className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-blue-500 focus:border-blue-500"
-              />
-            </div>
-
             <button
               type="submit"
               disabled={submitting}
@@ -148,18 +133,17 @@ export default function AdminTagsPage() {
                 <tr>
                   <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
                   <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Slug</th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Description</th>
                   <th scope="col" className="relative px-6 py-3"><span className="sr-only">Actions</span></th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {loading ? (
                   <tr>
-                    <td colSpan={4} className="px-6 py-12 text-center text-sm text-gray-500">Loading tags...</td>
+                    <td colSpan={3} className="px-6 py-12 text-center text-sm text-gray-500">Loading tags...</td>
                   </tr>
                 ) : tags.length === 0 ? (
                   <tr>
-                    <td colSpan={4} className="px-6 py-12 text-center text-sm text-gray-500">
+                    <td colSpan={3} className="px-6 py-12 text-center text-sm text-gray-500">
                       <Hash className="mx-auto h-12 w-12 text-gray-300 mb-2" />
                       No tags found.
                     </td>
@@ -178,7 +162,6 @@ export default function AdminTagsPage() {
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{tag.slug}</td>
-                      <td className="px-6 py-4 text-sm text-gray-500 max-w-xs truncate">{tag.description || "—"}</td>
                       <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                         <button onClick={() => handleDelete(tag.id)} className="text-gray-400 hover:text-red-600">
                           <Trash2 className="h-4 w-4" />

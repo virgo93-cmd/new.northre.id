@@ -36,12 +36,11 @@ export default function MidtransSettingsPage() {
 
   useEffect(() => {
     if (typeof window !== "undefined") {
-      setOrigin(window.location.origin);
+      queueMicrotask(() => setOrigin(window.location.origin));
     }
 
     async function loadConfig() {
       try {
-        setLoading(true);
         const data = await getSystemSetting<MidtransConfigValue>(
           "midtrans_config",
           DEFAULT_MIDTRANS_CONFIG
@@ -54,7 +53,7 @@ export default function MidtransSettingsPage() {
       }
     }
 
-    loadConfig();
+    queueMicrotask(() => void loadConfig());
   }, []);
 
   const webhookUrl = `${origin}/api/webhooks/midtrans`;

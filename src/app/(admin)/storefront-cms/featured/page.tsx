@@ -70,7 +70,7 @@ export default function StorefrontFeaturedPage() {
       setErrorMsg(null);
 
       // Hitung urutan sort_order berikutnya secara berurutan
-      let baseSortOrder = featured.length > 0 ? Math.max(...featured.map(f => f.sort_order)) + 1 : 0;
+      const baseSortOrder = featured.length > 0 ? Math.max(...featured.map(f => f.sort_order)) + 1 : 0;
       
       const payloads = selectedProductIds.map((prodId, index) => ({
         product_id: prodId,

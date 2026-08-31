@@ -1,5 +1,18 @@
 import { createClient } from "@/lib/supabase/client";
 import { Product } from "@/types";
+import type { Database } from "../../../types/database.types";
+
+type ProductInsert = Database["public"]["Tables"]["products"]["Insert"];
+type ProductUpdate = Database["public"]["Tables"]["products"]["Update"];
+
+interface VariantDraft {
+  is_active: boolean;
+  name: string;
+  key: string;
+  regular_price: string;
+  sale_price?: string;
+  stock_quantity: string;
+}
 
 /**
  * Interface khusus untuk payload save/update agar bisa menerima data relasional
@@ -9,7 +22,7 @@ export interface ProductSavePayload extends Partial<Product> {
   selectedTagIds?: string[];
   selectedCategoryIds?: string[]; // BARU: Array untuk multi-kategori
   galleryUrls?: string[];
-  variantsData?: any[]; 
+  variantsData?: VariantDraft[];
 }
 
 /**
@@ -43,9 +56,9 @@ export async function getProducts() {
   }
 
   // Format response untuk menghitung total order dari tabel order_items
-  const formattedData = data.map((product: any) => {
+  const formattedData = data.map((product) => {
     // Menghitung total quantity produk yang ada di order_items
-    const total_orders = product.order_items?.reduce((sum: number, item: any) => sum + (item.quantity || 0), 0) || 0;
+    const total_orders = product.order_items?.reduce((sum, item) => sum + (item.quantity || 0), 0) || 0;
     
     // Ambil kategori pertama sebagai fallback untuk UI lama (All Products)
     const primaryCategory = product.categories?.[0]?.category || null;
@@ -53,12 +66,12 @@ export async function getProducts() {
     return {
       ...product,
       category: primaryCategory, // Menjaga kompatibilitas dengan tabel All Products
-      all_categories: product.categories?.map((c: any) => c.category) || [], // Semua kategori
+      all_categories: product.categories?.map((categoryRelation) => categoryRelation.category) || [], // Semua kategori
       total_orders
     };
   });
 
-  return formattedData as any[];
+  return formattedData;
 }
 
 /**
@@ -107,7 +120,7 @@ export async function getProductBySlug(slug: string) {
     return null;
   }
 
-  return data as any;
+  return data;
 }
 
 /**
@@ -118,13 +131,14 @@ export async function createProduct(payload: ProductSavePayload) {
   
   // 1. Ekstrak data relasional dari payload
   // PENTING: Kita juga ekstrak `category_id` (jika ada dari UI lama) agar tidak ikut ter-insert ke tabel products
-  const { selectedTagIds, selectedCategoryIds, category_id, galleryUrls, variantsData, ...productData } = payload as any;
+  const { selectedTagIds, selectedCategoryIds, category_id: _categoryId, galleryUrls, variantsData, ...productData } = payload;
+  void _categoryId;
   
   // Format gallery_images 
   const productToSave = {
     ...productData,
     gallery_images: galleryUrls && galleryUrls.length > 0 ? galleryUrls : null,
-  };
+  } as ProductInsert;
 
   // 2. Insert ke tabel utama (products)
   const { data: newProduct, error: productError } = await supabase
@@ -167,10 +181,10 @@ export async function createProduct(payload: ProductSavePayload) {
 
   // 5. Insert ke tabel product_variants
   if (productData.type === "variable" && variantsData && variantsData.length > 0) {
-    const activeVariants = variantsData.filter((v: any) => v.is_active);
+    const activeVariants = variantsData.filter((variant) => variant.is_active);
     
     if (activeVariants.length > 0) {
-      const variantsToInsert = activeVariants.map((v: any) => {
+      const variantsToInsert = activeVariants.map((v) => {
         const attrObj: Record<string, string> = { "combination": v.name }; 
         return {
           product_id: productId,
@@ -201,12 +215,13 @@ export async function updateProduct(id: string, payload: ProductSavePayload) {
   const supabase = createClient();
   
   // 1. Ekstrak data relasional
-  const { selectedTagIds, selectedCategoryIds, category_id, galleryUrls, variantsData, ...productData } = payload as any;
+  const { selectedTagIds, selectedCategoryIds, category_id: _categoryId, galleryUrls, variantsData, ...productData } = payload;
+  void _categoryId;
   
   const productToSave = {
     ...productData,
     gallery_images: galleryUrls && galleryUrls.length > 0 ? galleryUrls : null,
-  };
+  } as ProductUpdate;
 
   // 2. Update tabel utama (products)
   const { data: updatedProduct, error: productError } = await supabase
@@ -250,9 +265,9 @@ export async function updateProduct(id: string, payload: ProductSavePayload) {
      await supabase.from("product_variants").delete().eq("product_id", id);
      
      // Insert varian baru
-     const activeVariants = variantsData.filter((v: any) => v.is_active);
+     const activeVariants = variantsData.filter((variant) => variant.is_active);
      if (activeVariants.length > 0) {
-      const variantsToInsert = activeVariants.map((v: any) => {
+      const variantsToInsert = activeVariants.map((v) => {
         const attrObj: Record<string, string> = { "combination": v.name }; 
         return {
           product_id: id,

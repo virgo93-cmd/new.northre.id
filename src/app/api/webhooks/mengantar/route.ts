@@ -1,156 +1,133 @@
+import { createHmac, timingSafeEqual } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
-import { MENGANTAR_CONFIG } from "@/lib/constants";
+import { createAdminClient } from "@/lib/supabase/admin";
+
+const MAX_WEBHOOK_AGE_MS = 5 * 60 * 1000;
+
+type MengantarWebhookPayload = {
+  cnote_no?: string;
+  order_id?: string;
+  status_category?: string;
+};
+
+function signaturesMatch(expected: string, received: string) {
+  const expectedBuffer = Buffer.from(expected, "hex");
+  const receivedBuffer = Buffer.from(received, "hex");
+  return expectedBuffer.length > 0 && expectedBuffer.length === receivedBuffer.length &&
+    timingSafeEqual(expectedBuffer, receivedBuffer);
+}
 
 export async function POST(req: NextRequest) {
   try {
-    // 1. Inisialisasi Supabase Client
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
-    const supabaseServiceKey =
-      process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "";
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
-
-    // 2. Ambil Secret Token dari database (fallback ke constants / env)
+    const supabase = createAdminClient();
     const { data: settingData } = await supabase
       .from("system_settings")
       .select("value")
       .eq("key", "mengantar_config")
       .maybeSingle();
 
-    const configuredSecret =
-      settingData?.value?.webhook_secret ||
-      MENGANTAR_CONFIG.webhookSecret ||
-      process.env.MENGANTAR_WEBHOOK_SECRET ||
-      "";
+    const storedConfig = settingData?.value && typeof settingData.value === "object" &&
+      !Array.isArray(settingData.value) ? settingData.value : null;
+    const storedSecret = storedConfig && "webhook_secret" in storedConfig &&
+      typeof storedConfig.webhook_secret === "string" ? storedConfig.webhook_secret : "";
+    const secret = process.env.MENGANTAR_WEBHOOK_SECRET || storedSecret;
 
-    // 3. Verifikasi Secret Token jika diatur
-    const incomingSecret =
-      req.headers.get("x-mengantar-secret") || req.headers.get("authorization");
-
-    if (
-      configuredSecret &&
-      incomingSecret !== configuredSecret &&
-      incomingSecret !== `Bearer ${configuredSecret}`
-    ) {
-      return NextResponse.json(
-        { error: "Unauthorized: Invalid webhook secret token." },
-        { status: 401 }
-      );
+    if (!secret) {
+      console.error("Mengantar webhook secret is not configured.");
+      return NextResponse.json({ error: "Webhook is not configured." }, { status: 503 });
     }
 
-    const body = await req.json();
-    const trackingNumber = body.tracking_number || body.awb || body.resi;
-    const orderNumber = body.order_id || body.reference_id;
-    const rawStatus = (body.status || body.shipping_status || "").toUpperCase();
+    const timestamp = req.headers.get("x-timestamp") || "";
+    const receivedSignature = req.headers.get("x-signature") || "";
+    const timestampMs = Number(timestamp);
+    const rawBody = await req.text();
+    const expectedSignature = createHmac("sha256", secret)
+      .update(`${timestamp}.${rawBody}`)
+      .digest("hex");
 
-    if (!trackingNumber && !orderNumber) {
-      return NextResponse.json(
-        { error: "Missing tracking_number or order_id in webhook payload." },
-        { status: 400 }
-      );
+    if (!Number.isFinite(timestampMs) || Math.abs(Date.now() - timestampMs) > MAX_WEBHOOK_AGE_MS ||
+      !signaturesMatch(expectedSignature, receivedSignature)) {
+      return NextResponse.json({ error: "Invalid webhook signature." }, { status: 401 });
     }
 
-    // 4. Cari pesanan berdasarkan tracking number atau order number
+    let body: MengantarWebhookPayload;
+    try {
+      body = JSON.parse(rawBody) as MengantarWebhookPayload;
+    } catch {
+      return NextResponse.json({ error: "Invalid JSON payload." }, { status: 400 });
+    }
+
+    const trackingNumber = body.cnote_no?.trim();
+    const mengantarOrderNumber = body.order_id?.trim();
+    const rawStatus = body.status_category?.trim().toUpperCase().replaceAll("_", " ") || "";
+
+    if (!trackingNumber && !mengantarOrderNumber) {
+      return NextResponse.json({ error: "Missing cnote_no or order_id." }, { status: 400 });
+    }
+
+    // AWB is the reliable key until the Mengantar order ID is persisted at fulfilment time.
     let orderQuery = supabase.from("orders").select("*");
-    if (orderNumber) {
-      orderQuery = orderQuery.eq("order_number", orderNumber);
-    } else if (trackingNumber) {
-      orderQuery = orderQuery.eq("tracking_number", trackingNumber);
+    if (trackingNumber) {
+      orderQuery = orderQuery.eq("shipping_tracking_number", trackingNumber);
+    } else {
+      orderQuery = orderQuery.eq("order_number", mengantarOrderNumber!);
     }
 
     const { data: order, error: orderError } = await orderQuery.maybeSingle();
-
     if (orderError || !order) {
-      return NextResponse.json(
-        { error: "Order not found for the provided shipment data." },
-        { status: 404 }
-      );
+      return NextResponse.json({ error: "Order not found for this shipment." }, { status: 404 });
     }
 
-    // 5. Mapping status ekspedisi
-    let newOrderStatus: "pending" | "processing" | "shipped" | "delivered" | "cancelled" =
+    let newOrderStatus: "pending" | "processing" | "shipped" | "delivered" | "cancelled" | "refunded" =
       order.status;
-
-    if (["PICKED_UP", "IN_TRANSIT", "ON_PROCESS", "SHIPPED"].includes(rawStatus)) {
+    if (["PICKED UP", "IN TRANSIT", "ON DELIVERY", "SHIPPED"].includes(rawStatus)) {
       newOrderStatus = "shipped";
-    } else if (["DELIVERED", "COMPLETED", "SUCCESS"].includes(rawStatus)) {
+    } else if (rawStatus === "DELIVERED") {
       newOrderStatus = "delivered";
-    } else if (["RETURNED", "CANCELLED", "FAILED"].includes(rawStatus)) {
+    } else if (["CANCELED", "CANCELLED", "RTS"].includes(rawStatus)) {
       newOrderStatus = "cancelled";
     }
 
-    // 6. Update database order & resi
-    const updatePayload: Record<string, any> = {
-      status: newOrderStatus,
-      updated_at: new Date().toISOString(),
-    };
-
-    if (trackingNumber && !order.tracking_number) {
-      updatePayload.tracking_number = trackingNumber;
+    const updatePayload: {
+      status: typeof newOrderStatus;
+      updated_at: string;
+      shipping_tracking_number?: string;
+    } = { status: newOrderStatus, updated_at: new Date().toISOString() };
+    if (trackingNumber && !order.shipping_tracking_number) {
+      updatePayload.shipping_tracking_number = trackingNumber;
     }
 
-    const { error: updateError } = await supabase
-      .from("orders")
-      .update(updatePayload)
-      .eq("id", order.id);
-
+    const { error: updateError } = await supabase.from("orders").update(updatePayload).eq("id", order.id);
     if (updateError) {
-      return NextResponse.json(
-        { error: "Failed to update shipment status." },
-        { status: 500 }
-      );
+      return NextResponse.json({ error: "Failed to update shipment status." }, { status: 500 });
     }
 
-    // 7. Trigger komisi afiliasi saat pesanan sampai (DELIVERED)
-    if (newOrderStatus === "delivered" && order.status !== "delivered" && order.user_id) {
-      const { data: userProfile } = await supabase
-        .from("profiles")
-        .select("id, referred_by")
-        .eq("id", order.user_id)
-        .maybeSingle();
-
+    if (newOrderStatus === "delivered" && order.status !== "delivered" && order.customer_id) {
+      const { data: userProfile } = await supabase.from("profiles").select("id, referred_by")
+        .eq("id", order.customer_id).maybeSingle();
       if (userProfile?.referred_by) {
-        const { data: referrerWallet } = await supabase
-          .from("wallets")
-          .select("id, balance, total_earned")
-          .eq("user_id", userProfile.referred_by)
-          .maybeSingle();
-
-        if (referrerWallet) {
-          const commissionAmount = Math.round(Number(order.total_amount) * 0.05);
-
-          if (commissionAmount > 0) {
-            await supabase
-              .from("wallets")
-              .update({
-                balance: Number(referrerWallet.balance) + commissionAmount,
-                total_earned: Number(referrerWallet.total_earned) + commissionAmount,
-                updated_at: new Date().toISOString(),
-              })
-              .eq("id", referrerWallet.id);
-
-            await supabase.from("wallet_transactions").insert({
-              wallet_id: referrerWallet.id,
-              user_id: userProfile.referred_by,
-              amount: commissionAmount,
-              type: "affiliate_commission",
-              description: `Affiliate referral reward for Order #${order.order_number}`,
-              reference_id: order.id,
-            });
+        const commissionAmount = Math.round(Number(order.total_amount) * 0.05);
+        if (commissionAmount > 0) {
+          const { error: commissionError } = await supabase.rpc("credit_affiliate_commission", {
+            p_order_id: order.id,
+            p_referrer_id: userProfile.referred_by,
+            p_amount: commissionAmount,
+            p_description: `Affiliate referral reward for Order #${order.order_number}`,
+          });
+          if (commissionError) {
+            console.error("Failed to credit affiliate commission:", commissionError.message);
+            return NextResponse.json({ error: "Failed to credit affiliate commission." }, { status: 500 });
           }
         }
       }
     }
 
-    return NextResponse.json({
-      success: true,
-      message: `Mengantar webhook processed: Order #${order.order_number} status updated to ${newOrderStatus}.`,
-    });
-  } catch (error: any) {
-    console.error("Mengantar Webhook Error:", error);
+    return NextResponse.json({ success: true });
+  } catch (error: unknown) {
+    console.error("Mengantar webhook error:", error);
     return NextResponse.json(
-      { error: error.message || "Internal server error." },
-      { status: 500 }
+      { error: error instanceof Error ? error.message : "Internal server error." },
+      { status: 500 },
     );
   }
 }

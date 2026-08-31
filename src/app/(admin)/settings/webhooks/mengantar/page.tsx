@@ -36,12 +36,11 @@ export default function MengantarSettingsPage() {
 
   useEffect(() => {
     if (typeof window !== "undefined") {
-      setOrigin(window.location.origin);
+      queueMicrotask(() => setOrigin(window.location.origin));
     }
 
     async function loadConfig() {
       try {
-        setLoading(true);
         const data = await getSystemSetting<MengantarConfigValue>(
           "mengantar_config",
           DEFAULT_MENGANTAR_CONFIG
@@ -54,7 +53,7 @@ export default function MengantarSettingsPage() {
       }
     }
 
-    loadConfig();
+    queueMicrotask(() => void loadConfig());
   }, []);
 
   const webhookUrl = `${origin}/api/webhooks/mengantar`;

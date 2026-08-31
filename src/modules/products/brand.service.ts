@@ -1,5 +1,8 @@
 import { createClient } from "@/lib/supabase/client";
 import { Brand } from "@/types";
+import type { Database } from "../../../types/database.types";
+
+type BrandInsert = Database["public"]["Tables"]["brands"]["Insert"];
 
 export async function getBrands() {
   const supabase = createClient();
@@ -16,7 +19,7 @@ export async function getBrands() {
   return data as Brand[];
 }
 
-export async function createBrand(brandData: Partial<Brand>) {
+export async function createBrand(brandData: BrandInsert) {
   const supabase = createClient();
   const { data, error } = await supabase
     .from("brands")

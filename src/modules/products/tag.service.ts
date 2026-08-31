@@ -1,5 +1,8 @@
 import { createClient } from "@/lib/supabase/client";
 import { Tag } from "@/types";
+import type { Database } from "../../../types/database.types";
+
+type TagInsert = Database["public"]["Tables"]["tags"]["Insert"];
 
 export async function getTags() {
   const supabase = createClient();
@@ -16,7 +19,7 @@ export async function getTags() {
   return data as Tag[];
 }
 
-export async function createTag(tagData: Partial<Tag>) {
+export async function createTag(tagData: TagInsert) {
   const supabase = createClient();
   const { data, error } = await supabase
     .from("tags")

@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/client";
+import type { Json } from "../../../types/database.types";
 
 export interface MidtransConfigValue {
   is_production: boolean;
@@ -25,17 +26,21 @@ export async function getSystemSetting<T>(key: string, defaultValue: T): Promise
     return defaultValue;
   }
 
+  if (typeof data.value !== "object" || data.value === null || Array.isArray(data.value)) {
+    return defaultValue;
+  }
+
   return { ...defaultValue, ...data.value };
 }
 
-export async function updateSystemSetting(key: string, value: Record<string, any>) {
+export async function updateSystemSetting<T extends object>(key: string, value: T) {
   const supabase = createClient();
   const { data, error } = await supabase
     .from("system_settings")
     .upsert(
       {
         key,
-        value,
+        value: JSON.parse(JSON.stringify(value)) as Json,
         updated_at: new Date().toISOString(),
       },
       { onConflict: "key" }

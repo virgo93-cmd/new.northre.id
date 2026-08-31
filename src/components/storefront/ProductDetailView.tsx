@@ -4,6 +4,34 @@ import { useState, useRef } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useCart } from "@/context/CartContext"; // 1. Hook diaktifkan
+import type { Json } from "../../../types/database.types";
+
+interface DetailVariant {
+  attributes: Json;
+  regular_price: number;
+  sale_price: number | null;
+}
+
+function getStringAttributes(value: Json): Record<string, string> {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) return {};
+
+  return Object.fromEntries(
+    Object.entries(value)
+      .filter((entry): entry is [string, string] => typeof entry[1] === "string"),
+  );
+}
+
+interface ProductDetail {
+  id: string;
+  slug: string;
+  name: string;
+  description: string | null;
+  image_url: string | null;
+  gallery_images?: Json | null;
+  regular_price: number;
+  sale_price: number | null;
+  variants?: DetailVariant[];
+}
 
 // Format Rupiah
 function toRp(num: number): string {
@@ -11,14 +39,16 @@ function toRp(num: number): string {
   return "RP " + num.toLocaleString("id-ID");
 }
 
-export default function ProductDetailView({ product }: { product: any }) {
+export default function ProductDetailView({ product }: { product: ProductDetail }) {
   const router = useRouter();
   const { addToCart } = useCart(); // 2. Fungsi addToCart dipanggil
   const [isAdded, setIsAdded] = useState(false);
 
   // 1. MAPPING GAMBAR
   const primaryImg = product.image_url;
-  const galleryImgs = product.gallery_images || [];
+  const galleryImgs = Array.isArray(product.gallery_images)
+    ? product.gallery_images.filter((image): image is string => typeof image === "string")
+    : [];
   const allImages = [...(primaryImg ? [primaryImg] : []), ...galleryImgs];
 
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -44,9 +74,10 @@ export default function ProductDetailView({ product }: { product: any }) {
     Size: new Set(),
   };
   
-  variations.forEach((v: any) => {
-    if (v.attributes) {
-      Object.entries(v.attributes).forEach(([key, val]) => {
+  variations.forEach((v) => {
+    const variantAttributes = getStringAttributes(v.attributes);
+    if (Object.keys(variantAttributes).length > 0) {
+      Object.entries(variantAttributes).forEach(([key, val]) => {
         const rawVal = String(val).trim();
         if (key.toLowerCase() === "combination" || rawVal.includes("-")) {
           const parts = rawVal.split("-").map(p => p.trim());
@@ -85,9 +116,10 @@ export default function ProductDetailView({ product }: { product: any }) {
   });
 
   // Logika Harga Berdasarkan Varian
-  const matchedVariation = variations.find((variation: any) => {
-    if (!variation.attributes) return false;
-    const varValues = Object.values(variation.attributes).map(v => String(v).toUpperCase());
+  const matchedVariation = variations.find((variation) => {
+    const variantAttributes = getStringAttributes(variation.attributes);
+    if (Object.keys(variantAttributes).length === 0) return false;
+    const varValues = Object.values(variantAttributes).map(v => v.toUpperCase());
     return Object.values(selectedAttributes).every(selectedOpt => 
       varValues.some(val => val.includes(selectedOpt))
     );
@@ -114,7 +146,7 @@ export default function ProductDetailView({ product }: { product: any }) {
       price: hasDiscount ? activeSalePrice : activeRegularPrice, 
       regular_price: activeRegularPrice, 
       quantity: quantity,
-      image: primaryImg,
+      image: primaryImg ?? undefined,
       selectedAttributes: selectedAttributes,
     };
 

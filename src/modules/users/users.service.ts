@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/client";
+import type { Database } from "../../../types/database.types";
 
-export type UserRole = "admin" | "customer" | "staff";
+export type UserRole = Database["public"]["Enums"]["user_role"];
 
 export interface UserAddress {
   id?: string;
@@ -8,11 +9,12 @@ export interface UserAddress {
   label: string;
   recipient_name: string;
   phone_number: string;
-  full_address: string;
+  street_address: string;
   city: string;
   province: string;
   postal_code: string;
-  is_primary: boolean;
+  is_default: boolean;
+  created_at: string;
 }
 
 export interface UserProfile {
